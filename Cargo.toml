@@ -1,0 +1,19 @@
+[package]
+name = "spd3303x"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+num = "0.4.3"
+serde = { version = "1.0.219", features = ["serde_derive"] }
+thiserror = "2.0.12"
+
+
+tokio = { version = "1.45.1", features = [
+    "macros",
+    "net",
+    "rt",
+    "io-util",
+    "sync",
+    # "rt-multi-thread",
+] }
