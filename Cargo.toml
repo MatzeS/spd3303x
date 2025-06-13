@@ -3,17 +3,14 @@ name = "spd3303x"
 version = "0.1.0"
 edition = "2024"
 
+description = "Library for controlling the *Siglent SPD3303X* programmable power supply."
+repository = "https://github.com/MatzeS/spd3303x"
+license = "MIT OR Apache-2.0"
+
 [dependencies]
-num = "0.4.3"
-serde = { version = "1.0.219", features = ["serde_derive"] }
-thiserror = "2.0.12"
+thiserror = "^2.0.0"
+tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
 
+[dev-dependencies]
 
-tokio = { version = "1.45.1", features = [
-    "macros",
-    "net",
-    "rt",
-    "io-util",
-    "sync",
-    # "rt-multi-thread",
-] }
+tokio = { version = "^1.0.0", features = ["rt"] }
