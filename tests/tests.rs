@@ -1,7 +1,7 @@
 use spd3303x::{
     Error, Result,
     channel_control::ChannelControl,
-    commands::{Channel, LimitQuantity, MemorySlot, Quantity, State},
+    commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
     spd3303x::Spd3303x,
 };
 
@@ -105,6 +105,36 @@ async fn test_output() -> Result<()> {
 
     channel.set_output(State::Off).await?;
     assert_eq!(channel.get_output().await?, State::Off);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_operation_mode() -> Result<()> {
+    let mut spd = test_device().await?;
+    spd.set_output_mode(OperationMode::Independent).await?;
+    assert_eq!(
+        spd.get_status().await?.operation_mode,
+        OperationMode::Independent
+    );
+
+    spd.set_output_mode(OperationMode::Parallel).await?;
+    assert_eq!(
+        spd.get_status().await?.operation_mode,
+        OperationMode::Parallel
+    );
+
+    spd.set_output_mode(OperationMode::Series).await?;
+    assert_eq!(
+        spd.get_status().await?.operation_mode,
+        OperationMode::Series
+    );
+
+    spd.set_output_mode(OperationMode::Independent).await?;
+    assert_eq!(
+        spd.get_status().await?.operation_mode,
+        OperationMode::Independent
+    );
 
     Ok(())
 }
