@@ -16,7 +16,7 @@ async fn main() -> Result<()> {
 
     let mut power_supply = Spd3303x::connect_hostname(hostname.as_str()).await?;
 
-    // Serial verification is recommended, to ensure
+    // Serial number verification is recommended, to ensure
     // you are not accidentally connecting to the wrong device.
     power_supply
         .verify_serial_number(serial_number.as_str())

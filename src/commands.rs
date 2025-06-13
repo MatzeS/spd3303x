@@ -922,5 +922,3 @@ mod tests {
         assert_eq!(response.hardware_version, "V3.0");
     }
 }
-
-// impl ScpiDeserialize MACRO
