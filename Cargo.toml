@@ -7,6 +7,9 @@ description = "Library for controlling the *Siglent SPD3303X* programmable power
 repository = "https://github.com/MatzeS/spd3303x"
 license = "MIT OR Apache-2.0"
 
+keywords = ["spd3303x", "scpi"]
+categories = []
+
 [dependencies]
 thiserror = "^2.0.0"
 tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
