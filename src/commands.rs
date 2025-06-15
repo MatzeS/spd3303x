@@ -203,6 +203,13 @@ impl From<Reading> for f32 {
 
 impl From<f32> for Reading {
     fn from(value: f32) -> Self {
+        // TODO should not silently clamp below zero
+        Reading::from_millis((value * 1000.0).round().max(0.0) as u16)
+    }
+}
+
+impl From<f64> for Reading {
+    fn from(value: f64) -> Self {
         Reading::from_millis((value * 1000.0).round().max(0.0) as u16)
     }
 }
