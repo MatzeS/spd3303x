@@ -33,6 +33,8 @@ Refer to the API documentation for details: [docs.rs](https://docs.rs/spd3303x/l
 
 The crate is currenlty on channel nightly for the 'pattern' feature.
 
+In the current early version of the crate (0.x.x), there may be breaking API changes without a major version bump.
+
 ## Reliability
 
 Integration tests may sporadically fail due to "Connection reset" errors.  
