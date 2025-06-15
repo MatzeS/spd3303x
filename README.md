@@ -29,7 +29,7 @@ This library implements the complete command set based on the official datasheet
 Reference: [SPD3303X/3303X-E Programmable DC Power Supply, Quick Start, EN_02A (2025-06-13)](https://www.siglenteu.com/wp-content/uploads/dlm_uploads/2022/11/SPD3303X_QuickStart_E02A.pdf)
 
 A convenient high-level programming interface is provided in [`src/spd3303x.rs`](src/spd3303x.rs) and [`src/channel_control.rs`](src/channel_control.rs).  
-Refer to the API documentation for details: [docs.rs](TODO)
+Refer to the API documentation for details: [docs.rs](https://docs.rs/spd3303x/latest)
 
 The crate is currenlty on channel nightly for the 'pattern' feature.
 
