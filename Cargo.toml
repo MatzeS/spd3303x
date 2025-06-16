@@ -1,6 +1,6 @@
 [package]
 name = "spd3303x"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 description = "Library for controlling the *Siglent SPD3303X* programmable power supply."
