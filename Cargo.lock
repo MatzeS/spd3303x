@@ -151,8 +151,7 @@ dependencies = [
 [[package]]
 name = "rs-usbtmc"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0ca8aa9a0fc1647a352518047d1ec363c150a54f16b2c120cb3a90067cdc6a4"
+source = "git+https://github.com/MatzeS/rs-usbtmc#1f0d0ce97776c30ce872844dac68e5f07f24d9b7"
 dependencies = [
  "anyhow",
  "rusb",
