@@ -33,19 +33,16 @@ pub struct Spd3303x {
     writer: WriteHalf<TcpStream>,
 }
 
-
 pub struct Spd3303xUsb {
     device: rs_usbtmc::UsbtmcClient,
 }
 
-
 impl Spd3303xUsb {
-
     /// Connect to the device
     /// siglent_vid: siglent device vendor ID (0xf4ec)
     /// siglent_pid: siglent device product ID (0x1430)
     pub fn connect_device(siglent_vid: u16, siglent_pid: u16) -> Result<Self> {
-        match UsbtmcClient::connect(siglent_vid, siglent_pid) {
+        match UsbtmcClient::connect((siglent_vid, siglent_pid)) {
             Ok(client) => {
                 println!("Connected via USBTMC!");
                 Ok(Self { device: client })
