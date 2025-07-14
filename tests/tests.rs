@@ -3,6 +3,7 @@ use spd3303x::{
     channel_control::ChannelControl,
     commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
     spd3303x::Spd3303x,
+    spd3303x::Spd3303xUsb,
 };
 
 async fn test_device() -> Result<Spd3303x> {
@@ -11,6 +12,10 @@ async fn test_device() -> Result<Spd3303x> {
 
     let power_supply = Spd3303x::connect_hostname(hostname.as_str()).await?;
     Ok(power_supply)
+}
+
+fn test_device_usb(vid: u16, pid: u16) -> Result<Spd3303xUsb> {
+    Spd3303xUsb::connect_device(vid, pid)
 }
 
 async fn test_channel() -> Result<ChannelControl> {
@@ -23,6 +28,19 @@ async fn test_identity() -> Result<()> {
     // This obviously only works with one specific device
     let mut spd = test_device().await?;
     let identity = spd.get_identity().await?;
+    assert_eq!(identity.company_name, "Siglent Technologies");
+    assert_eq!(identity.model_number, "SPD3303X");
+    assert_eq!(identity.serial_number, "SPD3XJGQ805993");
+    assert_eq!(identity.software_version, "1.01.01.03.11R1");
+    assert_eq!(identity.hardware_version, "V6.2");
+    Ok(())
+}
+
+#[test]
+fn test_identity_usb() -> Result<()> {
+    // This obviously only works with one specific device
+    let mut spd:Spd3303xUsb = test_device_usb(0xf4ec, 0x1430)?;
+    let identity = spd.send_idn_query()?;
     assert_eq!(identity.company_name, "Siglent Technologies");
     assert_eq!(identity.model_number, "SPD3303X");
     assert_eq!(identity.serial_number, "SPD3XJGQ805993");

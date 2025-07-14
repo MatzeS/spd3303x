@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    EmptyResponse, Error, Result, ScpiDeserialize, ScpiRequest,
+    EmptyResponse, Error, Result, ScpiDeserialize, ScpiRequest, ScpiSerialize,
     channel_control::ChannelControl,
     check_empty,
     commands::{
@@ -26,10 +26,74 @@ use tokio::{
     sync::Mutex,
 };
 
+use rs_usbtmc::UsbtmcClient;
+
 pub struct Spd3303x {
     reader: BufReader<ReadHalf<TcpStream>>,
     writer: WriteHalf<TcpStream>,
 }
+
+
+pub struct Spd3303xUsb {
+    device: rs_usbtmc::UsbtmcClient,
+}
+
+
+impl Spd3303xUsb {
+
+    /// Connect to the device
+    /// siglent_vid: siglent device vendor ID (0xf4ec)
+    /// siglent_pid: siglent device product ID (0x1430)
+    pub fn connect_device(siglent_vid: u16, siglent_pid: u16) -> Result<Self> {
+        match UsbtmcClient::connect(siglent_vid, siglent_pid) {
+            Ok(client) => {
+                println!("Connected via USBTMC!");
+                Ok(Self { device: client })
+            }
+            Err(e) => {
+                eprintln!("USB connection failed: {:?}", e);
+                Err(Error::ConnectFailed("USB device not found".to_string()))
+            }
+        }
+    }
+    
+    /// Send the SCPI *IDN? command and parse the response using IdentityResponse.
+    pub fn send_idn_query(&mut self) -> Result<IdentityResponse> {
+        // Create SCPI request
+        let request = IdentityRequest;
+        let mut command = String::new();
+        request.serialize(&mut command); // Converts to "*IDN?"
+
+        // Send query and get string response
+        let response_str = self
+        .device
+        .query(&command)
+        .map_err(|e| {
+            eprintln!("Failed to send query: {:?}", e);
+            Error::Other("Send query failed".to_string())
+        })?;
+
+
+        // Deserialize response string into typed response
+        let mut input = response_str.as_str();
+        match IdentityResponse::deserialize(&mut input) {
+            Ok(response) => {
+                if let Err(e) = check_empty(&mut input) {
+                    eprintln!("Trailing data after parsing IDN response: {:?}", e);
+                    return Err(e);
+                }
+                Ok(response)
+            }
+            Err(e) => {
+                eprintln!("Failed to parse IDN response: {:?}", e);
+                Err(e)
+            }
+        }
+    }   
+    
+
+}
+
 
 impl Spd3303x {
     /// Looks up the address(es) for `host` and tries connecting to the device.
