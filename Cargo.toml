@@ -11,6 +11,7 @@ keywords = ["spd3303x", "scpi"]
 categories = []
 
 [dependencies]
+anyhow = "1.0.98"
 thiserror = "^2.0.0"
 tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
 
