@@ -149,7 +149,9 @@ pub fn read_exact<'a>(input: &mut &'a str, len: usize) -> Result<&'a str> {
 }
 
 pub fn read_all(input: &mut &str) -> Result<String> {
-    Ok(read_until(input, '\n')?.to_string())
+    let result = input.to_string();
+    *input = "";
+    Ok(result)
 }
 
 pub fn check_empty(input: &mut &str) -> Result<()> {
@@ -252,7 +254,6 @@ mod tests {
     #[test]
     fn test_read_all() {
         let input = &mut "12,34\nasdf";
-        assert_eq!(read_all(input).unwrap(), "12,34");
-        assert!(match_literal(input, "asdf").is_ok());
+        assert_eq!(read_all(input).unwrap(), "12,34\nasdf");
     }
 }

@@ -19,6 +19,7 @@ use crate::{
         TimingGroup, WaveformDisplayRequest,
     },
     fixed_channel_control::FixedChannelControl,
+    match_literal,
 };
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
@@ -177,6 +178,7 @@ impl Spd3303x {
         self.reader.read_line(&mut line).await?;
         let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
+        match_literal(&mut data, "\n")?;
         check_empty(&mut data)?;
 
         Ok(response)
