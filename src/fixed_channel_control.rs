@@ -5,16 +5,16 @@ use tokio::sync::Mutex;
 use crate::{
     Result,
     commands::{OutputChannel, State},
-    spd3303x::Spd3303x,
+    spd3303x::{Driver, Spd3303x},
 };
 
-pub struct FixedChannelControl {
+pub struct FixedChannelControl<D: Driver> {
     channel: OutputChannel,
-    spd: Arc<Mutex<Spd3303x>>,
+    spd: Arc<Mutex<Spd3303x<D>>>,
 }
 
-impl FixedChannelControl {
-    pub fn new(spd: Arc<Mutex<Spd3303x>>, channel: OutputChannel) -> Self {
+impl<D: Driver> FixedChannelControl<D> {
+    pub fn new(spd: Arc<Mutex<Spd3303x<D>>>, channel: OutputChannel) -> Self {
         FixedChannelControl { spd, channel }
     }
 

@@ -1,7 +1,7 @@
 use spd3303x::{
     Error, Result,
     commands::{LimitQuantity, Quantity, Reading, State},
-    spd3303x::Spd3303x,
+    spd3303x::{NetworkDriver, Spd3303x},
 };
 
 #[tokio::main(flavor = "current_thread")]
@@ -14,7 +14,8 @@ async fn main() -> Result<()> {
         ))
     })?;
 
-    let mut power_supply = Spd3303x::connect_hostname(hostname.as_str()).await?;
+    let driver = NetworkDriver::connect_hostname(hostname.as_str()).await?;
+    let mut power_supply = Spd3303x { driver };
 
     // Serial number verification is recommended, to ensure
     // you are not accidentally connecting to the wrong device.

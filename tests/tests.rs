@@ -2,23 +2,24 @@ use spd3303x::{
     Error, Result,
     channel_control::ChannelControl,
     commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
-    spd3303x::Spd3303x,
-    spd3303x::Spd3303xUsb,
+    spd3303x::{NetworkDriver, Spd3303x, UsbDriver},
 };
 
-async fn test_device() -> Result<Spd3303x> {
+async fn test_device() -> Result<Spd3303x<NetworkDriver>> {
     let hostname = std::env::var("TEST_SPD3303X")
         .map_err(|e| Error::Other(format!("Environment variable TEST_SPD3303X not set! `{e}`")))?;
 
-    let power_supply = Spd3303x::connect_hostname(hostname.as_str()).await?;
+    let driver = NetworkDriver::connect_hostname(hostname.as_str()).await?;
+    let power_supply = Spd3303x { driver };
     Ok(power_supply)
 }
 
-fn test_device_usb(vid: u16, pid: u16) -> Result<Spd3303xUsb> {
-    Spd3303xUsb::connect_device(vid, pid)
+fn test_device_usb(vid: u16, pid: u16) -> Result<Spd3303x<UsbDriver>> {
+    let driver = UsbDriver::connect_device(vid, pid)?;
+    Ok(Spd3303x { driver })
 }
 
-async fn test_channel() -> Result<ChannelControl> {
+async fn test_channel() -> Result<ChannelControl<NetworkDriver>> {
     let spd = test_device().await?;
     Ok(spd.into_channels().0)
 }
@@ -36,11 +37,11 @@ async fn test_identity() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_identity_usb() -> Result<()> {
+#[tokio::test]
+async fn test_identity_usb() -> Result<()> {
     // This obviously only works with one specific device
-    let mut spd: Spd3303xUsb = test_device_usb(0xf4ec, 0x1430)?;
-    let identity = spd.send_idn_query()?;
+    let mut spd: Spd3303x<UsbDriver> = test_device_usb(0xf4ec, 0x1430)?;
+    let identity = spd.get_identity().await?;
     assert_eq!(identity.company_name, "Siglent Technologies");
     assert_eq!(identity.model_number, "SPD3303X");
     assert_eq!(identity.serial_number, "SPD3XJGQ805993");

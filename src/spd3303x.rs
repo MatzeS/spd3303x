@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::{
-    EmptyResponse, Error, Result, ScpiDeserialize, ScpiRequest, ScpiSerialize,
+    EmptyResponse, Error, Result, ScpiDeserialize, ScpiRequest,
     channel_control::ChannelControl,
     check_empty,
     commands::{
@@ -29,64 +29,12 @@ use tokio::{
 
 use rs_usbtmc::UsbtmcClient;
 
-pub struct Spd3303x {
+pub struct NetworkDriver {
     reader: BufReader<ReadHalf<TcpStream>>,
     writer: WriteHalf<TcpStream>,
 }
 
-pub struct Spd3303xUsb {
-    device: rs_usbtmc::UsbtmcClient,
-}
-
-impl Spd3303xUsb {
-    /// Connect to the device
-    /// siglent_vid: siglent device vendor ID (0xf4ec)
-    /// siglent_pid: siglent device product ID (0x1430)
-    pub fn connect_device(siglent_vid: u16, siglent_pid: u16) -> Result<Self> {
-        match UsbtmcClient::connect((siglent_vid, siglent_pid)) {
-            Ok(client) => {
-                println!("Connected via USBTMC!");
-                Ok(Self { device: client })
-            }
-            Err(e) => {
-                eprintln!("USB connection failed: {:?}", e);
-                Err(Error::ConnectFailed("USB device not found".to_string()))
-            }
-        }
-    }
-
-    /// Send the SCPI *IDN? command and parse the response using IdentityResponse.
-    pub fn send_idn_query(&mut self) -> Result<IdentityResponse> {
-        // Create SCPI request
-        let request = IdentityRequest;
-        let mut command = String::new();
-        request.serialize(&mut command); // Converts to "*IDN?"
-
-        // Send query and get string response
-        let response_str = self.device.query(&command).map_err(|e| {
-            eprintln!("Failed to send query: {:?}", e);
-            Error::Other("Send query failed".to_string())
-        })?;
-
-        // Deserialize response string into typed response
-        let mut input = response_str.as_str();
-        match IdentityResponse::deserialize(&mut input) {
-            Ok(response) => {
-                if let Err(e) = check_empty(&mut input) {
-                    eprintln!("Trailing data after parsing IDN response: {:?}", e);
-                    return Err(e);
-                }
-                Ok(response)
-            }
-            Err(e) => {
-                eprintln!("Failed to parse IDN response: {:?}", e);
-                Err(e)
-            }
-        }
-    }
-}
-
-impl Spd3303x {
+impl NetworkDriver {
     /// Looks up the address(es) for `host` and tries connecting to the device.
     /// Attempts all addresses,
     /// fails if connection could not be established on any address.
@@ -115,19 +63,84 @@ impl Spd3303x {
     pub async fn connect_address(addr: SocketAddr) -> Result<Self> {
         let socket = TcpSocket::new_v4()?;
         let stream = socket.connect(addr).await?;
-        Ok(Spd3303x::new(stream))
+        Ok(NetworkDriver::new(stream))
     }
 
     pub fn new(stream: TcpStream) -> Self {
         let (read_half, write_half) = tokio::io::split(stream);
         let reader = BufReader::new(read_half);
 
-        Spd3303x {
+        NetworkDriver {
             reader,
             writer: write_half,
         }
     }
+}
 
+pub struct UsbDriver {
+    device: rs_usbtmc::UsbtmcClient,
+}
+
+impl UsbDriver {
+    /// Connect to the device
+    /// siglent_vid: siglent device vendor ID (0xf4ec)
+    /// siglent_pid: siglent device product ID (0x1430)
+    pub fn connect_device(siglent_vid: u16, siglent_pid: u16) -> Result<Self> {
+        match UsbtmcClient::connect((siglent_vid, siglent_pid)) {
+            Ok(client) => {
+                println!("Connected via USBTMC!");
+                Ok(Self { device: client })
+            }
+            Err(e) => {
+                eprintln!("USB connection failed: {e:?}");
+                Err(Error::ConnectFailed("USB device not found".to_string()))
+            }
+        }
+    }
+}
+
+pub trait Driver {
+    fn send(&mut self, request: &str) -> impl Future<Output = Result<()>>;
+    fn send_and_receive(&mut self, request: &str) -> impl Future<Output = Result<String>>;
+}
+
+impl Driver for NetworkDriver {
+    async fn send(&mut self, request: &str) -> Result<()> {
+        self.writer.write_all(request.as_bytes()).await?;
+        Ok(())
+    }
+
+    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
+        self.send(request).await?;
+
+        let mut line = String::new();
+
+        self.reader.read_line(&mut line).await?;
+        Ok(line)
+    }
+}
+
+impl Driver for UsbDriver {
+    async fn send(&mut self, request: &str) -> Result<()> {
+        self.device.command(request).unwrap(); // TODO unwrap
+        Ok(())
+    }
+
+    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
+        let response = self.device.query(request).map_err(|e| {
+            eprintln!("Failed to send query: {e:?}");
+            Error::Other("Send query failed".to_string())
+        })?;
+
+        Ok(response)
+    }
+}
+
+pub struct Spd3303x<D: Driver> {
+    pub driver: D,
+}
+
+impl<D: Driver> Spd3303x<D> {
     pub async fn verify_serial_number(&mut self, serial_number: &str) -> Result<()> {
         let device_serial_number = self.get_identity().await?.serial_number;
 
@@ -139,7 +152,7 @@ impl Spd3303x {
             )))?
     }
 
-    pub fn into_channels(self) -> (ChannelControl, ChannelControl, FixedChannelControl) {
+    pub fn into_channels(self) -> (ChannelControl<D>, ChannelControl<D>, FixedChannelControl<D>) {
         let spd = Arc::new(Mutex::new(self));
         (
             ChannelControl::new(spd.clone(), Channel::One),
@@ -148,34 +161,27 @@ impl Spd3303x {
         )
     }
 
-    async fn send_raw<Request>(&mut self, request: Request) -> Result<()>
-    where
-        Request: ScpiRequest,
-    {
-        let mut out = String::with_capacity(128);
-        request.serialize(&mut out);
-        out.push('\n');
-        self.writer.write_all(out.as_bytes()).await?;
-
-        Ok(())
-    }
-
     async fn send<Request>(&mut self, request: Request) -> Result<()>
     where
         Request: ScpiRequest<Response = EmptyResponse>,
     {
-        self.send_raw(request).await
+        let mut out = String::with_capacity(128);
+        request.serialize(&mut out);
+        out.push('\n');
+        self.driver.send(out.as_str()).await
     }
+
     async fn execute<Request, Response>(&mut self, request: Request) -> Result<Response>
     where
         Request: ScpiRequest<Response = Response>,
         Response: ScpiDeserialize,
     {
-        self.send_raw(request).await?;
+        // TODO copy pasted
+        let mut out = String::with_capacity(128);
+        request.serialize(&mut out);
+        out.push('\n');
 
-        let mut line = String::new();
-
-        self.reader.read_line(&mut line).await?;
+        let line = self.driver.send_and_receive(out.as_str()).await?;
         let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
         match_literal(&mut data, "\n")?;
