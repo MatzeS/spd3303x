@@ -106,7 +106,12 @@ pub trait Driver {
 
 impl Driver for NetworkDriver {
     async fn send(&mut self, request: &str) -> Result<()> {
-        self.writer.write_all(request.as_bytes()).await?;
+        let mut request_with_newline = String::from(request);
+        request_with_newline.push('\n');
+
+        self.writer
+            .write_all(request_with_newline.as_bytes())
+            .await?;
         Ok(())
     }
 
@@ -116,7 +121,7 @@ impl Driver for NetworkDriver {
         let mut line = String::new();
 
         self.reader.read_line(&mut line).await?;
-        Ok(line)
+        Ok(line.trim_end().to_string())
     }
 }
 
@@ -179,12 +184,10 @@ impl<D: Driver> Spd3303x<D> {
         // TODO copy pasted
         let mut out = String::with_capacity(128);
         request.serialize(&mut out);
-        out.push('\n');
 
         let line = self.driver.send_and_receive(out.as_str()).await?;
         let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
-        match_literal(&mut data, "\n")?;
         check_empty(&mut data)?;
 
         Ok(response)
