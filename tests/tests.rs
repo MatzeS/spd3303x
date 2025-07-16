@@ -39,7 +39,7 @@ async fn test_identity() -> Result<()> {
 #[test]
 fn test_identity_usb() -> Result<()> {
     // This obviously only works with one specific device
-    let mut spd:Spd3303xUsb = test_device_usb(0xf4ec, 0x1430)?;
+    let mut spd: Spd3303xUsb = test_device_usb(0xf4ec, 0x1430)?;
     let identity = spd.send_idn_query()?;
     assert_eq!(identity.company_name, "Siglent Technologies");
     assert_eq!(identity.model_number, "SPD3303X");

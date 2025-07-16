@@ -53,7 +53,7 @@ impl Spd3303xUsb {
             }
         }
     }
-    
+
     /// Send the SCPI *IDN? command and parse the response using IdentityResponse.
     pub fn send_idn_query(&mut self) -> Result<IdentityResponse> {
         // Create SCPI request
@@ -62,14 +62,10 @@ impl Spd3303xUsb {
         request.serialize(&mut command); // Converts to "*IDN?"
 
         // Send query and get string response
-        let response_str = self
-        .device
-        .query(&command)
-        .map_err(|e| {
+        let response_str = self.device.query(&command).map_err(|e| {
             eprintln!("Failed to send query: {:?}", e);
             Error::Other("Send query failed".to_string())
         })?;
-
 
         // Deserialize response string into typed response
         let mut input = response_str.as_str();
@@ -86,11 +82,8 @@ impl Spd3303xUsb {
                 Err(e)
             }
         }
-    }   
-    
-
+    }
 }
-
 
 impl Spd3303x {
     /// Looks up the address(es) for `host` and tries connecting to the device.
