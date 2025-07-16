@@ -175,9 +175,7 @@ impl Spd3303x {
         let mut line = String::new();
 
         self.reader.read_line(&mut line).await?;
-        let data = line.as_str();
-
-        let mut data = data;
+        let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
         check_empty(&mut data)?;
 
