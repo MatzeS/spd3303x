@@ -18,8 +18,8 @@ pub enum Error {
     ConnectFailed(String),
     #[error("Serial mismatch: {0}")]
     SerialMismatch(String),
-    #[error("Other: {0}")]
-    Other(String),
+    #[error("{0}")]
+    Anyhow(#[from] anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

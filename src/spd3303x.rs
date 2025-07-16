@@ -126,15 +126,12 @@ impl Driver for NetworkDriver {
 
 impl Driver for UsbDriver {
     async fn send(&mut self, request: &str) -> Result<()> {
-        self.device.command(request).unwrap(); // TODO unwrap
+        self.device.command(request)?;
         Ok(())
     }
 
     async fn send_and_receive(&mut self, request: &str) -> Result<String> {
-        let response = self.device.query(request).map_err(|e| {
-            eprintln!("Failed to send query: {e:?}");
-            Error::Other("Send query failed".to_string())
-        })?;
+        let response = self.device.query(request)?;
 
         Ok(response)
     }

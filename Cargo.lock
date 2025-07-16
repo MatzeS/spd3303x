@@ -194,6 +194,7 @@ dependencies = [
 name = "spd3303x"
 version = "0.1.1"
 dependencies = [
+ "anyhow",
  "rs-usbtmc",
  "thiserror 2.0.12",
  "tokio",

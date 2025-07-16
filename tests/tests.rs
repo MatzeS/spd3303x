@@ -1,5 +1,6 @@
+use anyhow::anyhow;
 use spd3303x::{
-    Error, Result,
+    Result,
     channel_control::ChannelControl,
     commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
     spd3303x::{Driver, NetworkDriver, Spd3303x, UsbDriver},
@@ -7,7 +8,7 @@ use spd3303x::{
 
 async fn test_network_device() -> Result<Spd3303x<NetworkDriver>> {
     let hostname = std::env::var("TEST_SPD3303X")
-        .map_err(|e| Error::Other(format!("Environment variable TEST_SPD3303X not set! `{e}`")))?;
+        .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
 
     let driver = NetworkDriver::connect_hostname(hostname.as_str()).await?;
     let power_supply = Spd3303x { driver };
