@@ -88,6 +88,7 @@ impl UsbDriver {
         match UsbtmcClient::connect((siglent_vid, siglent_pid)) {
             Ok(client) => {
                 println!("Connected via USBTMC!");
+                client.read_raw()?;
                 Ok(Self { device: client })
             }
             Err(e) => {

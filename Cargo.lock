@@ -300,7 +300,7 @@ dependencies = [
 [[package]]
 name = "rs-usbtmc"
 version = "0.1.1"
-source = "git+https://github.com/MatzeS/rs-usbtmc#1f0d0ce97776c30ce872844dac68e5f07f24d9b7"
+source = "git+https://github.com/MatzeS/rs-usbtmc?branch=develop#7cdf96fc7fb878fe3aaac3bd395fa802af343e4e"
 dependencies = [
  "anyhow",
  "rusb",

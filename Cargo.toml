@@ -12,7 +12,7 @@ categories = []
 
 [dependencies]
 anyhow = "1.0.98"
-rs-usbtmc = { git = "https://github.com/MatzeS/rs-usbtmc" }
+rs-usbtmc = { git = "https://github.com/MatzeS/rs-usbtmc", branch = "develop" }
 thiserror = "^2.0.0"
 tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
 
