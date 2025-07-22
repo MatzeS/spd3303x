@@ -19,3 +19,4 @@ tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
 [dev-dependencies]
 
 tokio = { version = "^1.0.0", features = ["rt"] }
+serial_test = "3.2.0"
