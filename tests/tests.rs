@@ -1,6 +1,6 @@
 use spd3303x::{
     Error, Result,
-    channel_control::{self, ChannelControl},
+    channel_control::ChannelControl,
     commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
     spd3303x::{Driver, NetworkDriver, Spd3303x, UsbDriver},
 };

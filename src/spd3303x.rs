@@ -19,7 +19,6 @@ use crate::{
         TimingGroup, WaveformDisplayRequest,
     },
     fixed_channel_control::FixedChannelControl,
-    match_literal,
 };
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
