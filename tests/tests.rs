@@ -191,3 +191,24 @@ fn test_operation_mode_usb() -> Result<()> {
     let spd = test_usb_device()?;
     run_operation_mode_test(spd)
 }
+
+#[test]
+#[serial]
+fn test_auto_off_drop() -> Result<()> {
+    {
+        // Step 1: Create the SPD3303X instance inside a block
+        let mut spd = test_network_device()?;
+        spd.set_output(spd3303x::commands::OutputChannel::One, State::On)?;
+
+        // Optionally verify that it’s ON before dropping
+        let state = spd.get_output(Channel::One)?;
+        assert_eq!(state, State::On);
+    } // <- `spd` dropped here, Drop runs
+
+    // Step 2: Reconnect to check if the output is OFF
+    let mut spd = test_network_device()?;
+    let state = spd.get_output(Channel::One)?;
+    assert_eq!(state, State::Off, "Expected output to be OFF after drop");
+
+    Ok(())
+}
