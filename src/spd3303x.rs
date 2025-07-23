@@ -120,9 +120,33 @@ impl Driver for UsbDriver {
 
 pub struct Spd3303x<D: Driver> {
     pub driver: D,
+    auto_off_enabled: bool, //default = true
+}
+
+impl<D: Driver> Drop for Spd3303x<D> {
+    fn drop(&mut self) {
+        if !self.auto_off_enabled {
+            return;
+        }
+
+        let _ = self.set_output(OutputChannel::One, State::Off);
+        let _ = self.set_output(OutputChannel::Two, State::Off);
+        let _ = self.set_output(OutputChannel::Three, State::Off);
+    }
 }
 
 impl<D: Driver> Spd3303x<D> {
+    pub fn new(driver: D) -> Self {
+        Spd3303x {
+            driver,
+            auto_off_enabled: true,
+        }
+    }
+
+    pub fn disable_auto_off(&mut self) {
+        self.auto_off_enabled = false;
+    }
+
     pub fn verify_serial_number(&mut self, serial_number: &str) -> Result<()> {
         let device_serial_number = self.get_identity()?.serial_number;
 

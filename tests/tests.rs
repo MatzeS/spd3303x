@@ -12,13 +12,13 @@ fn test_network_device() -> Result<Spd3303x<NetworkDriver>> {
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
 
     let driver = NetworkDriver::connect_hostname(hostname.as_str())?;
-    let power_supply = Spd3303x { driver };
+    let power_supply = Spd3303x::new(driver);
     Ok(power_supply)
 }
 
 fn test_usb_device() -> Result<Spd3303x<UsbDriver>> {
     let driver = UsbDriver::connect_device()?;
-    Ok(Spd3303x { driver })
+    Ok(Spd3303x::new(driver))
 }
 
 fn test_channel_network() -> Result<ChannelControl<NetworkDriver>> {

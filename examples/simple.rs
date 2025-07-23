@@ -12,7 +12,7 @@ fn main() -> Result<()> {
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X_SERIAL not set! `{e}`"))?;
 
     let driver = NetworkDriver::connect_hostname(hostname.as_str())?;
-    let mut power_supply = Spd3303x { driver };
+    let mut power_supply = Spd3303x::new(driver);
 
     // Serial number verification is recommended, to ensure
     // you are not accidentally connecting to the wrong device.
