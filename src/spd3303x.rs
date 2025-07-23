@@ -25,6 +25,8 @@ use crate::{
 
 use anyhow::anyhow;
 use rs_usbtmc::UsbtmcClient;
+use std::sync::Mutex;
+
 pub struct NetworkDriver {
     stream: TcpStream,
 }
@@ -159,7 +161,7 @@ impl<D: Driver> Spd3303x<D> {
     }
 
     pub fn into_channels(self) -> (ChannelControl<D>, ChannelControl<D>, FixedChannelControl<D>) {
-        let spd = Arc::new(std::sync::Mutex::new(self));
+        let spd = Arc::new(Mutex::new(self));
         (
             ChannelControl::new(spd.clone(), Channel::One),
             ChannelControl::new(spd.clone(), Channel::Two),

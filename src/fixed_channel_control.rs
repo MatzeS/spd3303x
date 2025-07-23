@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use anyhow::anyhow;
 
 use crate::{
-    Error, Result,
+    Result,
     commands::{OutputChannel, State},
     spd3303x::{Driver, Spd3303x},
 };

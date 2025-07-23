@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use anyhow::anyhow;
 
 use crate::{
-    Error, Result,
+    Result,
     commands::{
         Channel, GetTimingParametersResponse, LimitQuantity, Quantity, Reading, State,
         TimeInterval, TimingGroup,
