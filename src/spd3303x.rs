@@ -39,7 +39,7 @@ impl NetworkDriver {
             .ok_or_else(|| anyhow!("Missing ':' separator in host string"))?;
         let port = port_str
             .parse::<u16>()
-            .map_err(|_| Error::Other("Invalid port".to_string()))?;
+            .map_err(|_| anyhow!("Invalid port"))?;
 
         let addresses = (hostname, port).to_socket_addrs()?.collect::<Vec<_>>();
         if addresses.is_empty() {

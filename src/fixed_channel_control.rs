@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use std::sync::Mutex;
 
+use anyhow::anyhow;
+
 use crate::{
     Error, Result,
     commands::{OutputChannel, State},
@@ -19,7 +21,7 @@ impl<D: Driver> FixedChannelControl<D> {
     }
 
     pub fn set_output(&self, state: State) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_output(self.channel, state)
     }
 }

@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use std::sync::Mutex;
 
+use anyhow::anyhow;
+
 use crate::{
     Error, Result,
     commands::{
@@ -23,32 +25,32 @@ impl<D: Driver> ChannelControl<D> {
     }
 
     pub fn measure(&self, quantity: Quantity) -> Result<f32> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.measure(self.channel, quantity)
     }
 
     pub fn set_limit(&self, quantity: LimitQuantity, value: Reading) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_limit(self.channel, quantity, value)
     }
 
     pub fn get_limit(&self, quantity: LimitQuantity) -> Result<f32> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.get_limit(self.channel, quantity)
     }
 
     pub fn set_output(&self, state: State) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_output(self.channel.into(), state)
     }
 
     pub fn get_output(&self) -> Result<State> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.get_output(self.channel)
     }
 
     pub fn set_waveform_display(&self, state: State) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_waveform_display(self.channel, state)
     }
 
@@ -59,17 +61,17 @@ impl<D: Driver> ChannelControl<D> {
         current: Reading,
         time: TimeInterval,
     ) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_timing_parameters(self.channel, group, voltage, current, time)
     }
 
     pub fn get_timing_parameters(&self, group: TimingGroup) -> Result<GetTimingParametersResponse> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.get_timing_parameters(self.channel, group)
     }
 
     pub fn set_timer(&self, state: State) -> Result<()> {
-        let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
         spd.set_timer(self.channel, state)
     }
 
