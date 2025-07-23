@@ -6,24 +6,24 @@ use spd3303x::{
     spd3303x::Spd3303x,
 };
 
-async fn test_device() -> Result<Spd3303x> {
+fn test_device() -> Result<Spd3303x> {
     let hostname = std::env::var("TEST_SPD3303X")
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
 
-    let power_supply = Spd3303x::connect_hostname(hostname.as_str()).await?;
+    let power_supply = Spd3303x::connect_hostname(hostname.as_str())?;
     Ok(power_supply)
 }
 
-async fn test_channel() -> Result<ChannelControl> {
-    let spd = test_device().await?;
+fn test_channel() -> Result<ChannelControl> {
+    let spd = test_device()?;
     Ok(spd.into_channels().0)
 }
 
-#[tokio::test]
-async fn test_identity() -> Result<()> {
+#[test]
+fn test_identity() -> Result<()> {
     // This obviously only works with one specific device
-    let mut spd = test_device().await?;
-    let identity = spd.get_identity().await?;
+    let mut spd = test_device()?;
+    let identity = spd.get_identity()?;
     assert_eq!(identity.company_name, "Siglent Technologies");
     assert_eq!(identity.model_number, "SPD3303X");
     assert_eq!(identity.serial_number, "SPD3XJGQ805993");
@@ -32,110 +32,81 @@ async fn test_identity() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_save_recall() -> Result<()> {
-    let mut spd = test_device().await?;
+#[test]
+fn test_save_recall() -> Result<()> {
+    let mut spd = test_device()?;
 
-    spd.set_limit(Channel::One, LimitQuantity::Current, 1.0.into())
-        .await?;
-    spd.save(MemorySlot::One).await?;
+    spd.set_limit(Channel::One, LimitQuantity::Current, 1.0.into())?;
+    spd.save(MemorySlot::One)?;
 
-    spd.set_limit(Channel::One, LimitQuantity::Current, 2.0.into())
-        .await?;
-    spd.save(MemorySlot::Two).await?;
+    spd.set_limit(Channel::One, LimitQuantity::Current, 2.0.into())?;
+    spd.save(MemorySlot::Two)?;
 
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        2.0
-    );
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 2.0);
 
-    spd.recall(MemorySlot::One).await?;
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        1.0
-    );
+    spd.recall(MemorySlot::One)?;
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 1.0);
 
-    spd.recall(MemorySlot::Two).await?;
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        2.0
-    );
+    spd.recall(MemorySlot::Two)?;
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 2.0);
 
     Ok(())
 }
 
-#[tokio::test]
-async fn test_measure() -> Result<()> {
-    let channel = test_channel().await?;
+#[test]
+fn test_measure() -> Result<()> {
+    let channel = test_channel()?;
 
-    channel
-        .set_limit(LimitQuantity::Voltage, 1.337.into())
-        .await?;
-    channel.set_output(State::Off).await?;
-    assert_eq!(channel.measure(Quantity::Voltage).await?, 0.0);
-    channel.set_output(State::On).await?;
-    assert!(channel.measure(Quantity::Voltage).await? > 1.250);
-    channel.set_output(State::Off).await?;
+    channel.set_limit(LimitQuantity::Voltage, 1.337.into())?;
+    channel.set_output(State::Off)?;
+    assert_eq!(channel.measure(Quantity::Voltage)?, 0.0);
+    channel.set_output(State::On)?;
+    assert!(channel.measure(Quantity::Voltage)? > 1.250);
+    channel.set_output(State::Off)?;
 
     Ok(())
 }
 
-#[tokio::test]
-async fn test_limit() -> Result<()> {
-    let channel = test_channel().await?;
+#[test]
+fn test_limit() -> Result<()> {
+    let channel = test_channel()?;
 
-    channel
-        .set_limit(LimitQuantity::Voltage, 1.337.into())
-        .await?;
-    assert_eq!(channel.get_limit(LimitQuantity::Voltage).await?, 1.337);
+    channel.set_limit(LimitQuantity::Voltage, 1.337.into())?;
+    assert_eq!(channel.get_limit(LimitQuantity::Voltage)?, 1.337);
 
-    channel
-        .set_limit(LimitQuantity::Voltage, 2.337.into())
-        .await?;
-    assert_eq!(channel.get_limit(LimitQuantity::Voltage).await?, 2.337);
+    channel.set_limit(LimitQuantity::Voltage, 2.337.into())?;
+    assert_eq!(channel.get_limit(LimitQuantity::Voltage)?, 2.337);
 
     Ok(())
 }
 
-#[tokio::test]
-async fn test_output() -> Result<()> {
-    let channel = test_channel().await?;
+#[test]
+fn test_output() -> Result<()> {
+    let channel = test_channel()?;
 
-    channel.set_output(State::On).await?;
-    assert_eq!(channel.get_output().await?, State::On);
+    channel.set_output(State::On)?;
+    assert_eq!(channel.get_output()?, State::On);
 
-    channel.set_output(State::Off).await?;
-    assert_eq!(channel.get_output().await?, State::Off);
+    channel.set_output(State::Off)?;
+    assert_eq!(channel.get_output()?, State::Off);
 
     Ok(())
 }
 
-#[tokio::test]
-async fn test_operation_mode() -> Result<()> {
-    let mut spd = test_device().await?;
-    spd.set_output_mode(OperationMode::Independent).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Independent
-    );
+#[test]
+fn test_operation_mode() -> Result<()> {
+    let mut spd = test_device()?;
+    spd.set_output_mode(OperationMode::Independent)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Independent);
 
-    spd.set_output_mode(OperationMode::Parallel).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Parallel
-    );
+    spd.set_output_mode(OperationMode::Parallel)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Parallel);
 
-    spd.set_output_mode(OperationMode::Series).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Series
-    );
+    spd.set_output_mode(OperationMode::Series)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Series);
 
-    spd.set_output_mode(OperationMode::Independent).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Independent
-    );
+    spd.set_output_mode(OperationMode::Independent)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Independent);
 
     Ok(())
 }
