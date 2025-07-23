@@ -4,7 +4,13 @@ Rust library for controlling the *Siglent SPD3303X* programmable power supply.
 
 ## Usage
 ```
-let mut power_supply = Spd3303x::connect_hostname("<IP goes here>")?;
+use spd3303x::{Driver, NetworkDriver, Spd3303x, UsbDriver},
+
+// Via Network
+let mut power_supply = NetworkDriver::connect_hostname("<IP goes here>")?;
+
+// Via USB-TMC
+let mut power_supply = UsbDriver::connect_device()?;
 
 // Double check we talk to the correct device.
 power_supply
@@ -18,11 +24,6 @@ ch1.set_limit(LimitQuantity::Current, Reading::from(0.1))?;
 ch1.set_output(State::On)?;
 ```
 
-## Limitations
-
-Only TCP/IP is supported.
-The USB interface is not (yet) implemented.
-
 ## Notes
 
 This library implements the complete command set based on the official datasheet. See [`src/commands.rs`](src/commands.rs).  
@@ -34,6 +35,15 @@ Refer to the API documentation for details: [docs.rs](https://docs.rs/spd3303x/l
 The crate is currenlty on channel nightly for the 'pattern' feature.
 
 In the current early version of the crate (0.x.x), there may be breaking API changes without a major version bump.
+
+## Auto-Turn-Off Behavior
+
+After certain channel configuration commands (e.g., voltage/current limit changes), the SPD3303X may automatically disable the channel output.
+This is a built-in safety feature of the device and not a bug in this library.
+
+This safety feature can be turned off using:
+
+power_supply.disable_auto_off();
 
 ## Reliability
 
