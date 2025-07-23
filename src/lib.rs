@@ -20,6 +20,8 @@ pub enum Error {
     SerialMismatch(String),
     #[error("{0}")]
     Anyhow(#[from] anyhow::Error),
+    #[error("Other: {0}")]
+    Other(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

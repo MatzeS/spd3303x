@@ -4,18 +4,18 @@ Rust library for controlling the *Siglent SPD3303X* programmable power supply.
 
 ## Usage
 ```
-let mut power_supply = Spd3303x::connect_hostname("<IP goes here>").await?;
+let mut power_supply = Spd3303x::connect_hostname("<IP goes here>")?;
 
 // Double check we talk to the correct device.
 power_supply
     .verify_serial_number("<your serial number>")
-    .await?;
+    ?;
 
 let (ch1, ch2, ch3) = power_supply.into_channels();
 
-ch1.set_limit(LimitQuantity::Voltage, Reading::from(1.000)) .await?;
-ch1.set_limit(LimitQuantity::Current, Reading::from(0.1)).await?;
-ch1.set_output(State::On).await?;
+ch1.set_limit(LimitQuantity::Voltage, Reading::from(1.000)) ?;
+ch1.set_limit(LimitQuantity::Current, Reading::from(0.1))?;
+ch1.set_output(State::On)?;
 ```
 
 ## Limitations

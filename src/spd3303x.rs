@@ -1,6 +1,8 @@
 use std::{
-    net::{Ipv4Addr, SocketAddr},
+    io::{BufRead, BufReader, Write},
+    net::{Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs},
     sync::Arc,
+    time::Duration,
 };
 
 use crate::{
@@ -20,25 +22,26 @@ use crate::{
     },
     fixed_channel_control::FixedChannelControl,
 };
-use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf},
-    net::{TcpSocket, TcpStream, lookup_host},
-    sync::Mutex,
-};
 
+use anyhow::anyhow;
 use rs_usbtmc::UsbtmcClient;
-
 pub struct NetworkDriver {
-    reader: BufReader<ReadHalf<TcpStream>>,
-    writer: WriteHalf<TcpStream>,
+    stream: TcpStream,
 }
 
 impl NetworkDriver {
     /// Looks up the address(es) for `host` and tries connecting to the device.
     /// Attempts all addresses,
     /// fails if connection could not be established on any address.
-    pub async fn connect_hostname(host: &str) -> Result<Self> {
-        let addresses = lookup_host(host).await?.collect::<Vec<_>>();
+    pub fn connect_hostname(host: &str) -> Result<Self> {
+        let (hostname, port_str) = host
+            .rsplit_once(':')
+            .ok_or_else(|| anyhow!("Missing ':' separator in host string"))?;
+        let port = port_str
+            .parse::<u16>()
+            .map_err(|_| Error::Other("Invalid port".to_string()))?;
+
+        let addresses = (hostname, port).to_socket_addrs()?.collect::<Vec<_>>();
         if addresses.is_empty() {
             return Err(Error::ConnectFailed(format!(
                 "Lookup provided no addresses for `{host}`"
@@ -46,11 +49,10 @@ impl NetworkDriver {
         }
 
         for addr in addresses {
-            let socket = TcpSocket::new_v4()?;
-            let stream = socket.connect(addr).await;
-            match stream {
-                Ok(e) => return Ok(Self::new(e)),
-                Err(_) => continue,
+            if let Ok(stream) = TcpStream::connect(addr) {
+                stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+                stream.set_write_timeout(Some(Duration::from_secs(2))).ok();
+                return Ok(Self { stream });
             }
         }
 
@@ -59,20 +61,9 @@ impl NetworkDriver {
         ))
     }
 
-    pub async fn connect_address(addr: SocketAddr) -> Result<Self> {
-        let socket = TcpSocket::new_v4()?;
-        let stream = socket.connect(addr).await?;
-        Ok(NetworkDriver::new(stream))
-    }
-
-    pub fn new(stream: TcpStream) -> Self {
-        let (read_half, write_half) = tokio::io::split(stream);
-        let reader = BufReader::new(read_half);
-
-        NetworkDriver {
-            reader,
-            writer: write_half,
-        }
+    pub fn connect_address(addr: SocketAddr) -> Result<Self> {
+        let stream = TcpStream::connect(addr)?;
+        Ok(Self { stream })
     }
 }
 
@@ -90,33 +81,38 @@ impl UsbDriver {
 }
 
 pub trait Driver {
-    fn send(&mut self, request: &str) -> impl Future<Output = Result<()>>;
-    fn send_and_receive(&mut self, request: &str) -> impl Future<Output = Result<String>>;
+    fn send(&mut self, request: &str) -> Result<()>;
+    fn send_and_receive(&mut self, request: &str) -> Result<String>;
 }
 
 impl Driver for NetworkDriver {
-    async fn send(&mut self, request: &str) -> Result<()> {
-        let request = format!("{request}\n");
-        self.writer.write_all(request.as_bytes()).await?;
+    fn send(&mut self, request: &str) -> Result<()> {
+        let mut request_with_newline = String::from(request);
+        request_with_newline.push('\n');
+
+        self.stream.write_all(request_with_newline.as_bytes())?;
+        self.stream.flush()?;
         Ok(())
     }
 
-    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
-        self.send(request).await?;
+    fn send_and_receive(&mut self, request: &str) -> Result<String> {
+        self.send(request)?;
 
+        let mut reader = BufReader::new(&mut self.stream);
         let mut line = String::new();
-        self.reader.read_line(&mut line).await?;
+
+        reader.read_line(&mut line)?;
         Ok(line.trim_end().to_string())
     }
 }
 
 impl Driver for UsbDriver {
-    async fn send(&mut self, request: &str) -> Result<()> {
+    fn send(&mut self, request: &str) -> Result<()> {
         self.device.command(request)?;
         Ok(())
     }
 
-    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
+    fn send_and_receive(&mut self, request: &str) -> Result<String> {
         let response = self.device.query(request)?;
         Ok(response)
     }
@@ -127,8 +123,8 @@ pub struct Spd3303x<D: Driver> {
 }
 
 impl<D: Driver> Spd3303x<D> {
-    pub async fn verify_serial_number(&mut self, serial_number: &str) -> Result<()> {
-        let device_serial_number = self.get_identity().await?.serial_number;
+    pub fn verify_serial_number(&mut self, serial_number: &str) -> Result<()> {
+        let device_serial_number = self.get_identity()?.serial_number;
 
         device_serial_number
             .eq(serial_number)
@@ -139,7 +135,7 @@ impl<D: Driver> Spd3303x<D> {
     }
 
     pub fn into_channels(self) -> (ChannelControl<D>, ChannelControl<D>, FixedChannelControl<D>) {
-        let spd = Arc::new(Mutex::new(self));
+        let spd = Arc::new(std::sync::Mutex::new(self));
         (
             ChannelControl::new(spd.clone(), Channel::One),
             ChannelControl::new(spd.clone(), Channel::Two),
@@ -147,17 +143,17 @@ impl<D: Driver> Spd3303x<D> {
         )
     }
 
-    async fn send<Request>(&mut self, request: Request) -> Result<()>
+    fn send<Request>(&mut self, request: Request) -> Result<()>
     where
         Request: ScpiRequest<Response = EmptyResponse>,
     {
         let mut out = String::with_capacity(128);
         request.serialize(&mut out);
         out.push('\n');
-        self.driver.send(out.as_str()).await
+        self.driver.send(out.as_str())
     }
 
-    async fn execute<Request, Response>(&mut self, request: Request) -> Result<Response>
+    fn execute<Request, Response>(&mut self, request: Request) -> Result<Response>
     where
         Request: ScpiRequest<Response = Response>,
         Response: ScpiDeserialize,
@@ -166,7 +162,7 @@ impl<D: Driver> Spd3303x<D> {
         let mut out = String::with_capacity(128);
         request.serialize(&mut out);
 
-        let line = self.driver.send_and_receive(out.as_str()).await?;
+        let line = self.driver.send_and_receive(out.as_str())?;
         let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
         check_empty(&mut data)?;
@@ -174,33 +170,31 @@ impl<D: Driver> Spd3303x<D> {
         Ok(response)
     }
 
-    pub async fn get_identity(&mut self) -> Result<IdentityResponse> {
-        self.execute(IdentityRequest).await
+    pub fn get_identity(&mut self) -> Result<IdentityResponse> {
+        self.execute(IdentityRequest)
     }
 
-    pub async fn save(&mut self, slot: MemorySlot) -> Result<()> {
-        self.send(SaveRequest { slot }).await
+    pub fn save(&mut self, slot: MemorySlot) -> Result<()> {
+        self.send(SaveRequest { slot })
     }
 
-    pub async fn recall(&mut self, slot: MemorySlot) -> Result<()> {
-        self.send(RecallRequest { slot }).await
+    pub fn recall(&mut self, slot: MemorySlot) -> Result<()> {
+        self.send(RecallRequest { slot })
     }
 
-    pub async fn get_selected_channel(&mut self) -> Result<Channel> {
-        self.execute(GetInstrumentRequest).await.map(|e| e.channel)
+    pub fn get_selected_channel(&mut self) -> Result<Channel> {
+        self.execute(GetInstrumentRequest).map(|e| e.channel)
     }
 
-    pub async fn measure(&mut self, channel: Channel, quantity: Quantity) -> Result<f32> {
-        let response = self
-            .execute(MeasureRequest {
-                quantity,
-                channel: Some(channel),
-            })
-            .await?;
+    pub fn measure(&mut self, channel: Channel, quantity: Quantity) -> Result<f32> {
+        let response = self.execute(MeasureRequest {
+            quantity,
+            channel: Some(channel),
+        })?;
         Ok(response.0.into())
     }
 
-    pub async fn set_limit(
+    pub fn set_limit(
         &mut self,
         channel: Channel,
         quantity: LimitQuantity,
@@ -211,32 +205,29 @@ impl<D: Driver> Spd3303x<D> {
             value,
             channel: Some(channel),
         })
-        .await
     }
 
-    pub async fn get_limit(&mut self, channel: Channel, quantity: LimitQuantity) -> Result<f32> {
-        let response = self
-            .execute(GetLimitRequest {
-                quantity,
-                channel: Some(channel),
-            })
-            .await?;
+    pub fn get_limit(&mut self, channel: Channel, quantity: LimitQuantity) -> Result<f32> {
+        let response = self.execute(GetLimitRequest {
+            quantity,
+            channel: Some(channel),
+        })?;
         Ok(response.0.into())
     }
 
-    pub async fn set_output(&mut self, channel: OutputChannel, state: State) -> Result<()> {
-        self.send(SetOutputStateRequest { channel, state }).await
+    pub fn set_output(&mut self, channel: OutputChannel, state: State) -> Result<()> {
+        self.send(SetOutputStateRequest { channel, state })
     }
 
-    pub async fn set_output_mode(&mut self, mode: OperationMode) -> Result<()> {
-        self.send(SetOperationModeRequest { mode }).await
+    pub fn set_output_mode(&mut self, mode: OperationMode) -> Result<()> {
+        self.send(SetOperationModeRequest { mode })
     }
 
-    pub async fn set_waveform_display(&mut self, channel: Channel, state: State) -> Result<()> {
-        self.send(WaveformDisplayRequest { channel, state }).await
+    pub fn set_waveform_display(&mut self, channel: Channel, state: State) -> Result<()> {
+        self.send(WaveformDisplayRequest { channel, state })
     }
 
-    pub async fn set_timing_parameters(
+    pub fn set_timing_parameters(
         &mut self,
         channel: Channel,
         group: TimingGroup,
@@ -250,70 +241,68 @@ impl<D: Driver> Spd3303x<D> {
             voltage,
             current,
             time,
-        })
-        .await?;
+        })?;
         Ok(())
     }
 
-    pub async fn get_timing_parameters(
+    pub fn get_timing_parameters(
         &mut self,
         channel: Channel,
         group: TimingGroup,
     ) -> Result<GetTimingParametersResponse> {
         self.execute(GetTimingParametersRequest { channel, group })
-            .await
     }
 
-    pub async fn set_timer(&mut self, channel: Channel, state: State) -> Result<()> {
-        self.send(SetTimerStateRequest { channel, state }).await
+    pub fn set_timer(&mut self, channel: Channel, state: State) -> Result<()> {
+        self.send(SetTimerStateRequest { channel, state })
     }
 
-    pub async fn get_error(&mut self) -> Result<SystemErrorResponse> {
-        self.execute(SystemErrorRequest).await
+    pub fn get_error(&mut self) -> Result<SystemErrorResponse> {
+        self.execute(SystemErrorRequest)
     }
 
-    pub async fn get_version(&mut self) -> Result<SystemVersionResponse> {
-        self.execute(SystemVersionRequest).await
+    pub fn get_version(&mut self) -> Result<SystemVersionResponse> {
+        self.execute(SystemVersionRequest)
     }
 
-    pub async fn get_status(&mut self) -> Result<SystemStatus> {
-        self.execute(SystemStatusRequest).await.map(|e| e.decode())
+    pub fn get_status(&mut self) -> Result<SystemStatus> {
+        self.execute(SystemStatusRequest).map(|e| e.decode())
     }
 
-    pub async fn set_ip_address(&mut self, addr: Ipv4Addr) -> Result<()> {
-        self.send(SetIpAddressRequest { addr }).await
+    pub fn set_ip_address(&mut self, addr: Ipv4Addr) -> Result<()> {
+        self.send(SetIpAddressRequest { addr })
     }
 
-    pub async fn get_ip_address(&mut self) -> Result<Ipv4Addr> {
-        self.execute(GetIpAddressRequest).await.map(|e| e.address)
+    pub fn get_ip_address(&mut self) -> Result<Ipv4Addr> {
+        self.execute(GetIpAddressRequest).map(|e| e.address)
     }
 
-    pub async fn set_subnet_mask(&mut self, mask: Ipv4Addr) -> Result<()> {
-        self.send(SetSubnetMaskRequest { mask }).await
+    pub fn set_subnet_mask(&mut self, mask: Ipv4Addr) -> Result<()> {
+        self.send(SetSubnetMaskRequest { mask })
     }
 
-    pub async fn get_subnet_mask(&mut self) -> Result<Ipv4Addr> {
-        self.execute(GetSubnetMaskRequest).await.map(|e| e.mask)
+    pub fn get_subnet_mask(&mut self) -> Result<Ipv4Addr> {
+        self.execute(GetSubnetMaskRequest).map(|e| e.mask)
     }
 
-    pub async fn set_gateway(&mut self, gateway: Ipv4Addr) -> Result<()> {
-        self.send(SetGatewayRequest { gateway }).await
+    pub fn set_gateway(&mut self, gateway: Ipv4Addr) -> Result<()> {
+        self.send(SetGatewayRequest { gateway })
     }
 
-    pub async fn get_gateway(&mut self) -> Result<Ipv4Addr> {
-        self.execute(GetGatewayRequest).await.map(|e| e.gateway)
+    pub fn get_gateway(&mut self) -> Result<Ipv4Addr> {
+        self.execute(GetGatewayRequest).map(|e| e.gateway)
     }
 
-    pub async fn set_dhcp(&mut self, state: State) -> Result<()> {
-        self.send(SetDhcpRequest { state }).await
+    pub fn set_dhcp(&mut self, state: State) -> Result<()> {
+        self.send(SetDhcpRequest { state })
     }
 
-    pub async fn get_dhcp(&mut self) -> Result<State> {
-        self.execute(GetDhcpRequest).await.map(|e| e.state)
+    pub fn get_dhcp(&mut self) -> Result<State> {
+        self.execute(GetDhcpRequest).map(|e| e.state)
     }
 
-    pub async fn get_output(&mut self, channel: Channel) -> Result<State> {
-        let status = self.get_status().await?;
+    pub fn get_output(&mut self, channel: Channel) -> Result<State> {
+        let status = self.get_status()?;
         Ok(status.get(channel).output)
     }
 }
