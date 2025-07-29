@@ -77,24 +77,15 @@ impl NetworkDriver {
 }
 
 pub struct UsbDriver {
-    device: rs_usbtmc::UsbtmcClient,
+    device: UsbtmcClient,
 }
 
 impl UsbDriver {
-    /// Connect to the device
-    /// siglent_vid: siglent device vendor ID (0xf4ec)
-    /// siglent_pid: siglent device product ID (0x1430)
-    pub fn connect_device(siglent_vid: u16, siglent_pid: u16) -> Result<Self> {
-        match UsbtmcClient::connect((siglent_vid, siglent_pid)) {
-            Ok(client) => {
-                println!("Connected via USBTMC!");
-                Ok(Self { device: client })
-            }
-            Err(e) => {
-                eprintln!("USB connection failed: {e:?}");
-                Err(Error::ConnectFailed("USB device not found".to_string()))
-            }
-        }
+    pub fn connect_device() -> Result<Self> {
+        const VID: u16 = 0xf4ec;
+        const PID: u16 = 0x1430;
+        let client = UsbtmcClient::connect((VID, PID))?;
+        Ok(Self { device: client })
     }
 }
 
@@ -105,12 +96,8 @@ pub trait Driver {
 
 impl Driver for NetworkDriver {
     async fn send(&mut self, request: &str) -> Result<()> {
-        let mut request_with_newline = String::from(request);
-        request_with_newline.push('\n');
-
-        self.writer
-            .write_all(request_with_newline.as_bytes())
-            .await?;
+        let request = format!("{request}\n");
+        self.writer.write_all(request.as_bytes()).await?;
         Ok(())
     }
 
@@ -118,7 +105,6 @@ impl Driver for NetworkDriver {
         self.send(request).await?;
 
         let mut line = String::new();
-
         self.reader.read_line(&mut line).await?;
         Ok(line.trim_end().to_string())
     }
@@ -132,7 +118,6 @@ impl Driver for UsbDriver {
 
     async fn send_and_receive(&mut self, request: &str) -> Result<String> {
         let response = self.device.query(request)?;
-
         Ok(response)
     }
 }

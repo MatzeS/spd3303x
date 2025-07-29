@@ -16,8 +16,8 @@ async fn test_network_device() -> Result<Spd3303x<NetworkDriver>> {
     Ok(power_supply)
 }
 
-async fn test_usb_device(vid: u16, pid: u16) -> Result<Spd3303x<UsbDriver>> {
-    let driver = UsbDriver::connect_device(vid, pid)?;
+async fn test_usb_device() -> Result<Spd3303x<UsbDriver>> {
+    let driver = UsbDriver::connect_device()?;
     Ok(Spd3303x { driver })
 }
 
@@ -27,7 +27,7 @@ async fn test_channel_network() -> Result<ChannelControl<NetworkDriver>> {
 }
 
 async fn test_channel_usb() -> Result<ChannelControl<UsbDriver>> {
-    let spd = test_usb_device(0xf4ec, 0x1430).await?;
+    let spd = test_usb_device().await?;
     Ok(spd.into_channels().0)
 }
 
@@ -53,7 +53,7 @@ async fn test_identity_network() -> Result<()> {
 #[serial]
 async fn test_identity_usb() -> Result<()> {
     // This obviously only works with one specific device
-    let spd = test_usb_device(0xf4ec, 0x1430).await?;
+    let spd = test_usb_device().await?;
     run_identity_test(spd).await
 }
 
@@ -96,7 +96,7 @@ async fn test_save_recall_network() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_save_recall_usb() -> Result<()> {
-    let spd = test_usb_device(0xf4ec, 0x1430).await?;
+    let spd = test_usb_device().await?;
     run_save_recall_test(spd).await
 }
 
@@ -217,6 +217,6 @@ async fn test_operation_mode_network() -> Result<()> {
 #[tokio::test]
 #[serial]
 async fn test_operation_mode_usb() -> Result<()> {
-    let spd = test_usb_device(0xf4ec, 0x1430).await?;
+    let spd = test_usb_device().await?;
     run_operation_mode_test(spd).await
 }
