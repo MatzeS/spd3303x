@@ -37,7 +37,7 @@ where
 
 // Rename Query
 pub trait ScpiRequest: ScpiSerialize {
-    type Response: ScpiDeserialize;
+    type Response;
 }
 
 impl<T: ScpiSerialize> ScpiSerialize for Option<T> {
@@ -48,12 +48,10 @@ impl<T: ScpiSerialize> ScpiSerialize for Option<T> {
     }
 }
 
+/// Response type to indicate that no answer is expected.
+/// The communication driver will not attempt to receive a
+/// response for an associated request.
 pub struct EmptyResponse;
-impl ScpiDeserialize for EmptyResponse {
-    fn deserialize(_input: &mut &str) -> Result<Self> {
-        Ok(EmptyResponse)
-    }
-}
 
 impl ScpiDeserialize for u16 {
     fn deserialize(input: &mut &str) -> crate::Result<Self> {
