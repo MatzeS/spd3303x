@@ -18,8 +18,8 @@ pub enum Error {
     ConnectFailed(String),
     #[error("Serial mismatch: {0}")]
     SerialMismatch(String),
-    #[error("Other: {0}")]
-    Other(String),
+    #[error("{0}")]
+    Anyhow(#[from] anyhow::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -37,7 +37,7 @@ where
 
 // Rename Query
 pub trait ScpiRequest: ScpiSerialize {
-    type Response: ScpiDeserialize;
+    type Response;
 }
 
 impl<T: ScpiSerialize> ScpiSerialize for Option<T> {
@@ -48,12 +48,10 @@ impl<T: ScpiSerialize> ScpiSerialize for Option<T> {
     }
 }
 
+/// Response type to indicate that no answer is expected.
+/// The communication driver will not attempt to receive a
+/// response for an associated request.
 pub struct EmptyResponse;
-impl ScpiDeserialize for EmptyResponse {
-    fn deserialize(_input: &mut &str) -> Result<Self> {
-        Ok(EmptyResponse)
-    }
-}
 
 impl ScpiDeserialize for u16 {
     fn deserialize(input: &mut &str) -> crate::Result<Self> {
@@ -149,7 +147,9 @@ pub fn read_exact<'a>(input: &mut &'a str, len: usize) -> Result<&'a str> {
 }
 
 pub fn read_all(input: &mut &str) -> Result<String> {
-    Ok(read_until(input, '\n')?.to_string())
+    let result = input.to_string();
+    *input = "";
+    Ok(result)
 }
 
 pub fn check_empty(input: &mut &str) -> Result<()> {
@@ -252,7 +252,6 @@ mod tests {
     #[test]
     fn test_read_all() {
         let input = &mut "12,34\nasdf";
-        assert_eq!(read_all(input).unwrap(), "12,34");
-        assert!(match_literal(input, "asdf").is_ok());
+        assert_eq!(read_all(input).unwrap(), "12,34\nasdf");
     }
 }

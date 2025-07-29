@@ -26,12 +26,14 @@ use tokio::{
     sync::Mutex,
 };
 
-pub struct Spd3303x {
+use rs_usbtmc::UsbtmcClient;
+
+pub struct NetworkDriver {
     reader: BufReader<ReadHalf<TcpStream>>,
     writer: WriteHalf<TcpStream>,
 }
 
-impl Spd3303x {
+impl NetworkDriver {
     /// Looks up the address(es) for `host` and tries connecting to the device.
     /// Attempts all addresses,
     /// fails if connection could not be established on any address.
@@ -60,19 +62,71 @@ impl Spd3303x {
     pub async fn connect_address(addr: SocketAddr) -> Result<Self> {
         let socket = TcpSocket::new_v4()?;
         let stream = socket.connect(addr).await?;
-        Ok(Spd3303x::new(stream))
+        Ok(NetworkDriver::new(stream))
     }
 
     pub fn new(stream: TcpStream) -> Self {
         let (read_half, write_half) = tokio::io::split(stream);
         let reader = BufReader::new(read_half);
 
-        Spd3303x {
+        NetworkDriver {
             reader,
             writer: write_half,
         }
     }
+}
 
+pub struct UsbDriver {
+    device: UsbtmcClient,
+}
+
+impl UsbDriver {
+    pub fn connect_device() -> Result<Self> {
+        const VID: u16 = 0xf4ec;
+        const PID: u16 = 0x1430;
+        let client = UsbtmcClient::connect((VID, PID))?;
+        Ok(Self { device: client })
+    }
+}
+
+pub trait Driver {
+    fn send(&mut self, request: &str) -> impl Future<Output = Result<()>>;
+    fn send_and_receive(&mut self, request: &str) -> impl Future<Output = Result<String>>;
+}
+
+impl Driver for NetworkDriver {
+    async fn send(&mut self, request: &str) -> Result<()> {
+        let request = format!("{request}\n");
+        self.writer.write_all(request.as_bytes()).await?;
+        Ok(())
+    }
+
+    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
+        self.send(request).await?;
+
+        let mut line = String::new();
+        self.reader.read_line(&mut line).await?;
+        Ok(line.trim_end().to_string())
+    }
+}
+
+impl Driver for UsbDriver {
+    async fn send(&mut self, request: &str) -> Result<()> {
+        self.device.command(request)?;
+        Ok(())
+    }
+
+    async fn send_and_receive(&mut self, request: &str) -> Result<String> {
+        let response = self.device.query(request)?;
+        Ok(response)
+    }
+}
+
+pub struct Spd3303x<D: Driver> {
+    pub driver: D,
+}
+
+impl<D: Driver> Spd3303x<D> {
     pub async fn verify_serial_number(&mut self, serial_number: &str) -> Result<()> {
         let device_serial_number = self.get_identity().await?.serial_number;
 
@@ -84,7 +138,7 @@ impl Spd3303x {
             )))?
     }
 
-    pub fn into_channels(self) -> (ChannelControl, ChannelControl, FixedChannelControl) {
+    pub fn into_channels(self) -> (ChannelControl<D>, ChannelControl<D>, FixedChannelControl<D>) {
         let spd = Arc::new(Mutex::new(self));
         (
             ChannelControl::new(spd.clone(), Channel::One),
@@ -93,37 +147,27 @@ impl Spd3303x {
         )
     }
 
-    async fn send_raw<Request>(&mut self, request: Request) -> Result<()>
-    where
-        Request: ScpiRequest,
-    {
-        let mut out = String::with_capacity(128);
-        request.serialize(&mut out);
-        out.push('\n');
-        self.writer.write_all(out.as_bytes()).await?;
-
-        Ok(())
-    }
-
     async fn send<Request>(&mut self, request: Request) -> Result<()>
     where
         Request: ScpiRequest<Response = EmptyResponse>,
     {
-        self.send_raw(request).await
+        let mut out = String::with_capacity(128);
+        request.serialize(&mut out);
+        out.push('\n');
+        self.driver.send(out.as_str()).await
     }
+
     async fn execute<Request, Response>(&mut self, request: Request) -> Result<Response>
     where
         Request: ScpiRequest<Response = Response>,
         Response: ScpiDeserialize,
     {
-        self.send_raw(request).await?;
+        // TODO copy pasted
+        let mut out = String::with_capacity(128);
+        request.serialize(&mut out);
 
-        let mut line = String::new();
-
-        self.reader.read_line(&mut line).await?;
-        let data = line.as_str();
-
-        let mut data = data;
+        let line = self.driver.send_and_receive(out.as_str()).await?;
+        let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
         check_empty(&mut data)?;
 

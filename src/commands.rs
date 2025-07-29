@@ -29,7 +29,8 @@ impl ScpiDeserialize for IdentityResponse {
             model_number: read_until(input, ',')?.trim().to_string(),
             serial_number: read_until(input, ',')?.trim().to_string(),
             software_version: read_until(input, ',')?.trim().to_string(),
-            hardware_version: read_until(input, '\n')?.trim().to_string(),
+            hardware_version: read_while(input, |c: char| c.is_alphanumeric() || c == '.')
+                .to_string(),
         })
     }
 }
@@ -235,7 +236,7 @@ impl ScpiDeserialize for Reading {
 impl ScpiDeserialize for MeasureResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let value = Reading::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(MeasureResponse(value))
     }
 }
@@ -319,7 +320,7 @@ pub struct GetLimitResponse(pub Reading);
 impl ScpiDeserialize for GetLimitResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let value = Reading::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(GetLimitResponse(value))
     }
 }
@@ -737,7 +738,7 @@ impl ScpiDeserialize for SystemStatusResponse {
         let value =
             u16::from_str_radix(read_while(input, |c: char| char::is_ascii_hexdigit(&c)), 16)
                 .map_err(|e| Error::ResponseDecoding(format!("Failed to parse hex: {e}")))?;
-        match_literal(input, "\n")?;
+
         Ok(SystemStatusResponse { value })
     }
 }
@@ -803,7 +804,7 @@ pub struct GetIpAddressResponse {
 impl ScpiDeserialize for GetIpAddressResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let address = Ipv4Addr::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(GetIpAddressResponse { address })
     }
 }
@@ -836,7 +837,7 @@ pub struct GetSubnetMaskResponse {
 impl ScpiDeserialize for GetSubnetMaskResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let mask = Ipv4Addr::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(GetSubnetMaskResponse { mask })
     }
 }
@@ -869,7 +870,7 @@ pub struct GetGatewayResponse {
 impl ScpiDeserialize for GetGatewayResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let gateway = Ipv4Addr::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(GetGatewayResponse { gateway })
     }
 }
@@ -903,7 +904,7 @@ impl ScpiDeserialize for GetDhcpResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         match_literal(input, "DHCP:")?;
         let state = State::deserialize(input)?;
-        match_literal(input, "\n")?;
+
         Ok(GetDhcpResponse { state })
     }
 }
@@ -920,7 +921,7 @@ mod tests {
         let mut out = String::new();
         request.serialize(&mut out);
         assert_eq!(out, "*IDN?");
-        let response = &mut "Siglent Technologies, SPD3303X, SPD00001130025, 1.01.01.01.02,V3.0\n";
+        let response = &mut "Siglent Technologies, SPD3303X, SPD00001130025, 1.01.01.01.02,V3.0";
         let response = IdentityResponse::deserialize(response).unwrap();
         assert_eq!(response.company_name, "Siglent Technologies");
         assert_eq!(response.model_number, "SPD3303X");

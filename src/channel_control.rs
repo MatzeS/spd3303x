@@ -9,16 +9,16 @@ use crate::{
         TimeInterval, TimingGroup,
     },
     fixed_channel_control::FixedChannelControl,
-    spd3303x::Spd3303x,
+    spd3303x::{Driver, Spd3303x},
 };
 
-pub struct ChannelControl {
+pub struct ChannelControl<D: Driver> {
     channel: Channel,
-    spd: Arc<Mutex<Spd3303x>>,
+    spd: Arc<Mutex<Spd3303x<D>>>,
 }
 
-impl ChannelControl {
-    pub fn new(spd: Arc<Mutex<Spd3303x>>, channel: Channel) -> Self {
+impl<D: Driver> ChannelControl<D> {
+    pub fn new(spd: Arc<Mutex<Spd3303x<D>>>, channel: Channel) -> Self {
         ChannelControl { spd, channel }
     }
 
@@ -77,13 +77,13 @@ impl ChannelControl {
         spd.set_timer(self.channel, state).await
     }
 
-    pub fn to_fixed(self) -> FixedChannelControl {
+    pub fn to_fixed(self) -> FixedChannelControl<D> {
         self.into()
     }
 }
 
-impl From<ChannelControl> for FixedChannelControl {
-    fn from(value: ChannelControl) -> Self {
+impl<D: Driver> From<ChannelControl<D>> for FixedChannelControl<D> {
+    fn from(value: ChannelControl<D>) -> Self {
         FixedChannelControl::new(value.spd, value.channel.into())
     }
 }
