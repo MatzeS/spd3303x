@@ -1,8 +1,8 @@
 use std::{net::Ipv4Addr, ops::Neg};
 
 use crate::{
-    EmptyResponse, Error, ScpiDeserialize, ScpiSerialize, impl_scpi_request, impl_scpi_serialize,
-    match_literal, read_all, read_until, read_while, scpi_enum,
+    impl_scpi_request, impl_scpi_serialize, match_literal, read_all, read_until, read_while,
+    scpi_enum, EmptyResponse, Error, ScpiDeserialize, ScpiSerialize,
 };
 
 // 1. *IDN?
@@ -773,7 +773,7 @@ impl ScpiSerialize for Ipv4Addr {
 impl ScpiDeserialize for Ipv4Addr {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let address = input
-            .trim()
+            .trim() // does this operate correclty with below buffer advance? advance the buffer first, then consume the advanced section
             .parse()
             .map_err(|e| Error::ResponseDecoding(format!("Failed to parse IPv4 Address: {e}")))?;
 
