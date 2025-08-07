@@ -64,6 +64,11 @@ impl Spd3303x {
     }
 
     pub fn new(stream: TcpStream) -> Self {
+        // When performing a SAVE or RECALL operation the device stalls for
+        // a considerable time, multiple seconds.
+        // 10 seconds seems reasonable to accommodate this
+        stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
+        stream.set_write_timeout(Some(Duration::from_secs(10))).ok();
         Spd3303x { stream }
     }
 
