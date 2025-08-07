@@ -5,10 +5,11 @@ use std::{
     time::Duration,
 };
 
+use scpi_client::{EmptyResponse, ScpiDeserialize, ScpiRequest, check_empty};
+
 use crate::{
-    EmptyResponse, Error, Result, ScpiDeserialize, ScpiRequest,
+    Error, Result,
     channel_control::ChannelControl,
-    check_empty,
     commands::{
         Channel, GetDhcpRequest, GetGatewayRequest, GetInstrumentRequest, GetIpAddressRequest,
         GetLimitRequest, GetSubnetMaskRequest, GetTimingParametersRequest,
@@ -124,7 +125,7 @@ impl Spd3303x {
 
         let mut data = line.as_str();
         let response = Response::deserialize(&mut data)?;
-        check_empty(&mut data)?;
+        check_empty(data)?;
 
         Ok(response)
     }
@@ -229,7 +230,7 @@ impl Spd3303x {
     }
 
     pub fn set_ip_address(&mut self, addr: Ipv4Addr) -> Result<()> {
-        self.send(SetIpAddressRequest { addr })
+        self.send(SetIpAddressRequest { addr: addr.into() })
     }
 
     pub fn get_ip_address(&mut self) -> Result<Ipv4Addr> {
@@ -237,7 +238,7 @@ impl Spd3303x {
     }
 
     pub fn set_subnet_mask(&mut self, mask: Ipv4Addr) -> Result<()> {
-        self.send(SetSubnetMaskRequest { mask })
+        self.send(SetSubnetMaskRequest { mask: mask.into() })
     }
 
     pub fn get_subnet_mask(&mut self) -> Result<Ipv4Addr> {
@@ -245,7 +246,9 @@ impl Spd3303x {
     }
 
     pub fn set_gateway(&mut self, gateway: Ipv4Addr) -> Result<()> {
-        self.send(SetGatewayRequest { gateway })
+        self.send(SetGatewayRequest {
+            gateway: gateway.into(),
+        })
     }
 
     pub fn get_gateway(&mut self) -> Result<Ipv4Addr> {

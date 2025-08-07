@@ -14,5 +14,7 @@ categories = []
 anyhow = "1.0.98"
 thiserror = "^2.0.0"
 
+scpi-client = { path = "../scpi-client" }
+
 [dev-dependencies]
 serial_test = "3.2.0"

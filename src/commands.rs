@@ -1,6 +1,6 @@
 use std::{net::Ipv4Addr, ops::Neg};
 
-use crate::{
+use scpi_client::{
     EmptyResponse, Error, ScpiDeserialize, ScpiSerialize, impl_scpi_request, impl_scpi_serialize,
     match_literal, read_all, read_until, read_while, scpi_enum,
 };
@@ -481,7 +481,7 @@ impl ScpiSerialize for TimeInterval {
 }
 
 impl ScpiDeserialize for TimeInterval {
-    fn deserialize(input: &mut &str) -> crate::Result<Self> {
+    fn deserialize(input: &mut &str) -> Result<Self, Error> {
         Ok(TimeInterval(u16::deserialize(input)?))
     }
 }
@@ -736,13 +736,30 @@ impl ScpiDeserialize for SystemStatusResponse {
         match_literal(input, "0x")?;
         let value =
             u16::from_str_radix(read_while(input, |c: char| char::is_ascii_hexdigit(&c)), 16)
-                .map_err(|e| Error::ResponseDecoding(format!("Failed to parse hex: {e}")))?;
+                .map_err(|e| {
+                    scpi_client::Error::ResponseDecoding(format!("Failed to parse hex: {e}"))
+                })?;
         match_literal(input, "\n")?;
         Ok(SystemStatusResponse { value })
     }
 }
 
 impl_scpi_request!(SystemStatusRequest, SystemStatusResponse);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DottedDecimalNotationIpv4Addr(Ipv4Addr);
+
+impl From<DottedDecimalNotationIpv4Addr> for Ipv4Addr {
+    fn from(value: DottedDecimalNotationIpv4Addr) -> Self {
+        value.0
+    }
+}
+
+impl From<Ipv4Addr> for DottedDecimalNotationIpv4Addr {
+    fn from(value: Ipv4Addr) -> Self {
+        Self(value)
+    }
+}
 
 // 11. IPaddr
 // Command format IPaddr <IP address>
@@ -751,25 +768,25 @@ impl_scpi_request!(SystemStatusRequest, SystemStatusResponse);
 // Note The command is invalid when the state of DHCP is on
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetIpAddressRequest {
-    pub addr: Ipv4Addr,
+    pub addr: DottedDecimalNotationIpv4Addr,
 }
 impl_scpi_serialize!(SetIpAddressRequest, ["IPaddr ", addr]);
 impl_scpi_request!(SetIpAddressRequest, EmptyResponse);
 
-impl ScpiSerialize for Ipv4Addr {
+impl ScpiSerialize for DottedDecimalNotationIpv4Addr {
     fn serialize(&self, out: &mut String) {
         let result = format!(
             "{}.{}.{}.{}",
-            self.octets()[0],
-            self.octets()[1],
-            self.octets()[2],
-            self.octets()[3]
+            self.0.octets()[0],
+            self.0.octets()[1],
+            self.0.octets()[2],
+            self.0.octets()[3]
         );
         out.push_str(result.as_str());
     }
 }
 
-impl ScpiDeserialize for Ipv4Addr {
+impl ScpiDeserialize for DottedDecimalNotationIpv4Addr {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         let address = input
             .trim()
@@ -777,7 +794,7 @@ impl ScpiDeserialize for Ipv4Addr {
             .map_err(|e| Error::ResponseDecoding(format!("Failed to parse IPv4 Address: {e}")))?;
 
         // advance input reader
-        read_while(input, char::is_numeric);
+        read_while(input, char::is_numeric); //TODO is_digit?
         match_literal(input, ".")?;
         read_while(input, char::is_numeric);
         match_literal(input, ".")?;
@@ -785,7 +802,7 @@ impl ScpiDeserialize for Ipv4Addr {
         match_literal(input, ".")?;
         read_while(input, char::is_numeric);
 
-        Ok(address)
+        Ok(DottedDecimalNotationIpv4Addr(address))
     }
 }
 
@@ -802,9 +819,9 @@ pub struct GetIpAddressResponse {
 }
 impl ScpiDeserialize for GetIpAddressResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
-        let address = Ipv4Addr::deserialize(input)?;
+        let address = DottedDecimalNotationIpv4Addr::deserialize(input)?;
         match_literal(input, "\n")?;
-        Ok(GetIpAddressResponse { address })
+        Ok(GetIpAddressResponse { address: address.0 })
     }
 }
 
@@ -817,7 +834,7 @@ impl_scpi_request!(GetIpAddressRequest, GetIpAddressResponse);
 // Note The command is invalid when the state of DHCP is on
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetSubnetMaskRequest {
-    pub mask: Ipv4Addr,
+    pub mask: DottedDecimalNotationIpv4Addr,
 }
 impl_scpi_serialize!(SetSubnetMaskRequest, ["MASKaddr ", mask]);
 impl_scpi_request!(SetSubnetMaskRequest, EmptyResponse);
@@ -835,9 +852,9 @@ pub struct GetSubnetMaskResponse {
 }
 impl ScpiDeserialize for GetSubnetMaskResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
-        let mask = Ipv4Addr::deserialize(input)?;
+        let mask = DottedDecimalNotationIpv4Addr::deserialize(input)?;
         match_literal(input, "\n")?;
-        Ok(GetSubnetMaskResponse { mask })
+        Ok(GetSubnetMaskResponse { mask: mask.0 })
     }
 }
 
@@ -850,7 +867,7 @@ impl_scpi_request!(GetSubnetMaskRequest, GetSubnetMaskResponse);
 // Note The command is invalid when the state of DHCP is on
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetGatewayRequest {
-    pub gateway: Ipv4Addr,
+    pub gateway: DottedDecimalNotationIpv4Addr,
 }
 impl_scpi_serialize!(SetGatewayRequest, ["GATEaddr ", gateway]);
 impl_scpi_request!(SetGatewayRequest, EmptyResponse);
@@ -868,9 +885,9 @@ pub struct GetGatewayResponse {
 }
 impl ScpiDeserialize for GetGatewayResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
-        let gateway = Ipv4Addr::deserialize(input)?;
+        let gateway = DottedDecimalNotationIpv4Addr::deserialize(input)?;
         match_literal(input, "\n")?;
-        Ok(GetGatewayResponse { gateway })
+        Ok(GetGatewayResponse { gateway: gateway.0 })
     }
 }
 
