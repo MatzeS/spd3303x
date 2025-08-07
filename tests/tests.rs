@@ -110,3 +110,17 @@ fn test_operation_mode() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_auto_turn_off() -> Result<()> {
+    {
+        let channel = test_channel()?.into_auto_turn_off();
+        channel.set_output(State::On)?;
+        assert_eq!(channel.get_output()?, State::On);
+    }
+
+    let channel = test_channel()?;
+    assert_eq!(channel.get_output()?, State::Off);
+
+    Ok(())
+}

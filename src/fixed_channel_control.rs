@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use std::sync::Mutex;
 
+use crate::auto_turn_off::AutoTurnOff;
 use crate::{
     Error, Result,
     commands::{OutputChannel, State},
@@ -21,5 +22,9 @@ impl FixedChannelControl {
     pub fn set_output(&self, state: State) -> Result<()> {
         let mut spd = self.spd.lock().map_err(|e| Error::Other(e.to_string()))?;
         spd.set_output(self.channel, state)
+    }
+
+    pub fn into_auto_turn_off(self) -> AutoTurnOff<Self> {
+        AutoTurnOff::new(self)
     }
 }

@@ -17,7 +17,8 @@ fn main() -> Result<()> {
     // you are not accidentally connecting to the wrong device.
     power_supply.verify_serial_number(serial_number.as_str())?;
 
-    let (ch1, _ch2, ch3) = power_supply.into_channels();
+    // Auto turn off ensures the channel is turned off, when the channel is dropped.
+    let (ch1, _ch2, ch3) = power_supply.into_auto_turn_off_channels();
 
     ch1.set_limit(LimitQuantity::Voltage, Reading::from(1.000))?;
     ch1.set_limit(LimitQuantity::Current, Reading::from(0.1))?;
@@ -29,7 +30,7 @@ fn main() -> Result<()> {
     ch3.set_output(State::Off)?;
 
     ch1.set_output(State::On)?;
-    ch1.set_output(State::Off)?;
+    // Due to auto turnoff, ch1 will be turned off before exiting.
 
     Ok(())
 }

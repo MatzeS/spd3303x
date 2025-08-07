@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use std::sync::Mutex;
 
+use crate::auto_turn_off::AutoTurnOff;
 use crate::{
     Error, Result,
     commands::{
@@ -75,6 +76,10 @@ impl ChannelControl {
 
     pub fn to_fixed(self) -> FixedChannelControl {
         self.into()
+    }
+
+    pub fn into_auto_turn_off(self) -> AutoTurnOff<Self> {
+        AutoTurnOff::new(self)
     }
 }
 

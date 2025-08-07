@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+pub mod auto_turn_off;
 pub mod channel_control;
 pub mod commands;
 pub mod fixed_channel_control;

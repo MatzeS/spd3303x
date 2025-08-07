@@ -9,6 +9,7 @@ use scpi_client::{EmptyResponse, ScpiDeserialize, ScpiRequest, check_empty};
 
 use crate::{
     Error, Result,
+    auto_turn_off::AutoTurnOff,
     channel_control::ChannelControl,
     commands::{
         Channel, GetDhcpRequest, GetGatewayRequest, GetInstrumentRequest, GetIpAddressRequest,
@@ -84,12 +85,31 @@ impl Spd3303x {
             )))?
     }
 
+    pub fn into_auto_turn_off(self) -> AutoTurnOff<Self> {
+        AutoTurnOff::new(self)
+    }
+
     pub fn into_channels(self) -> (ChannelControl, ChannelControl, FixedChannelControl) {
         let spd = Arc::new(Mutex::new(self));
         (
             ChannelControl::new(spd.clone(), Channel::One),
             ChannelControl::new(spd.clone(), Channel::Two),
             FixedChannelControl::new(spd, OutputChannel::Three),
+        )
+    }
+
+    pub fn into_auto_turn_off_channels(
+        self,
+    ) -> (
+        AutoTurnOff<ChannelControl>,
+        AutoTurnOff<ChannelControl>,
+        AutoTurnOff<FixedChannelControl>,
+    ) {
+        let (a, b, c) = self.into_channels();
+        (
+            a.into_auto_turn_off(),
+            b.into_auto_turn_off(),
+            c.into_auto_turn_off(),
         )
     }
 
