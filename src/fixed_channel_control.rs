@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
+use std::sync::Mutex;
+
+use anyhow::anyhow;
 
 use crate::{
     Result,
@@ -18,8 +20,8 @@ impl<D: Driver> FixedChannelControl<D> {
         FixedChannelControl { spd, channel }
     }
 
-    pub async fn set_output(&self, state: State) -> Result<()> {
-        let mut spd = self.spd.lock().await;
-        spd.set_output(self.channel, state).await
+    pub fn set_output(&self, state: State) -> Result<()> {
+        let mut spd = self.spd.lock().map_err(|e| anyhow!("{e}"))?;
+        spd.set_output(self.channel, state)
     }
 }

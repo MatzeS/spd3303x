@@ -14,9 +14,7 @@ categories = []
 anyhow = "1.0.98"
 rs-usbtmc = { git = "https://github.com/MatzeS/rs-usbtmc" }
 thiserror = "^2.0.0"
-tokio = { version = "^1.0.0", features = ["macros", "net", "io-util", "sync"] }
 
 [dev-dependencies]
 
-tokio = { version = "^1.0.0", features = ["rt"] }
 serial_test = "3.2.0"

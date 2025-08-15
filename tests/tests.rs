@@ -7,32 +7,32 @@ use spd3303x::{
     spd3303x::{Driver, NetworkDriver, Spd3303x, UsbDriver},
 };
 
-async fn test_network_device() -> Result<Spd3303x<NetworkDriver>> {
+fn test_network_device() -> Result<Spd3303x<NetworkDriver>> {
     let hostname = std::env::var("TEST_SPD3303X")
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
 
-    let driver = NetworkDriver::connect_hostname(hostname.as_str()).await?;
-    let power_supply = Spd3303x { driver };
+    let driver = NetworkDriver::connect_hostname(hostname.as_str())?;
+    let power_supply = Spd3303x::new(driver);
     Ok(power_supply)
 }
 
-async fn test_usb_device() -> Result<Spd3303x<UsbDriver>> {
+fn test_usb_device() -> Result<Spd3303x<UsbDriver>> {
     let driver = UsbDriver::connect_device()?;
-    Ok(Spd3303x { driver })
+    Ok(Spd3303x::new(driver))
 }
 
-async fn test_channel_network() -> Result<ChannelControl<NetworkDriver>> {
-    let spd = test_network_device().await?;
+fn test_channel_network() -> Result<ChannelControl<NetworkDriver>> {
+    let spd = test_network_device()?;
     Ok(spd.into_channels().0)
 }
 
-async fn test_channel_usb() -> Result<ChannelControl<UsbDriver>> {
-    let spd = test_usb_device().await?;
+fn test_channel_usb() -> Result<ChannelControl<UsbDriver>> {
+    let spd = test_usb_device()?;
     Ok(spd.into_channels().0)
 }
 
-async fn run_identity_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
-    let identity = spd.get_identity().await?;
+fn run_identity_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
+    let identity = spd.get_identity()?;
     assert_eq!(identity.company_name, "Siglent Technologies");
     assert_eq!(identity.model_number, "SPD3303X");
     assert_eq!(identity.serial_number, "SPD3XJGQ805993");
@@ -41,182 +41,174 @@ async fn run_identity_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_identity_network() -> Result<()> {
+fn test_identity_network() -> Result<()> {
     // This obviously only works with one specific device
-    let spd = test_network_device().await?;
-    run_identity_test(spd).await
+    let spd = test_network_device()?;
+    run_identity_test(spd)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_identity_usb() -> Result<()> {
+fn test_identity_usb() -> Result<()> {
     // This obviously only works with one specific device
-    let spd = test_usb_device().await?;
-    run_identity_test(spd).await
+    let spd = test_usb_device()?;
+    run_identity_test(spd)
 }
 
-async fn run_save_recall_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
-    spd.set_limit(Channel::One, LimitQuantity::Current, 1.0.into())
-        .await?;
-    spd.save(MemorySlot::One).await?;
+fn run_save_recall_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
+    spd.set_limit(Channel::One, LimitQuantity::Current, 1.0.into())?;
+    spd.save(MemorySlot::One)?;
 
-    spd.set_limit(Channel::One, LimitQuantity::Current, 2.0.into())
-        .await?;
-    spd.save(MemorySlot::Two).await?;
+    spd.set_limit(Channel::One, LimitQuantity::Current, 2.0.into())?;
+    spd.save(MemorySlot::Two)?;
 
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        2.0
-    );
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 2.0);
 
-    spd.recall(MemorySlot::One).await?;
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        1.0
-    );
+    spd.recall(MemorySlot::One)?;
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 1.0);
 
-    spd.recall(MemorySlot::Two).await?;
-    assert_eq!(
-        spd.get_limit(Channel::One, LimitQuantity::Current).await?,
-        2.0
-    );
+    spd.recall(MemorySlot::Two)?;
+    assert_eq!(spd.get_limit(Channel::One, LimitQuantity::Current)?, 2.0);
 
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_save_recall_network() -> Result<()> {
-    let spd = test_network_device().await?;
-    run_save_recall_test(spd).await
+fn test_save_recall_network() -> Result<()> {
+    let spd = test_network_device()?;
+    run_save_recall_test(spd)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_save_recall_usb() -> Result<()> {
-    let spd = test_usb_device().await?;
-    run_save_recall_test(spd).await
+fn test_save_recall_usb() -> Result<()> {
+    let spd = test_usb_device()?;
+    run_save_recall_test(spd)
 }
 
-async fn run_measure_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
-    channel
-        .set_limit(LimitQuantity::Voltage, 1.337.into())
-        .await?;
-    channel.set_output(State::Off).await?;
-    assert_eq!(channel.measure(Quantity::Voltage).await?, 0.0);
-    channel.set_output(State::On).await?;
-    assert!(channel.measure(Quantity::Voltage).await? > 1.250);
-    channel.set_output(State::Off).await?;
+fn run_measure_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
+    channel.set_limit(LimitQuantity::Voltage, 1.337.into())?;
+    channel.set_output(State::Off)?;
+    assert_eq!(channel.measure(Quantity::Voltage)?, 0.0);
+    channel.set_output(State::On)?;
+    assert!(channel.measure(Quantity::Voltage)? > 1.250);
+    channel.set_output(State::Off)?;
 
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_measure_network() -> Result<()> {
-    let channel = test_channel_network().await?;
-    run_measure_test(channel).await
+fn test_measure_network() -> Result<()> {
+    let channel = test_channel_network()?;
+    run_measure_test(channel)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_measure_usb() -> Result<()> {
-    let channel = test_channel_usb().await?;
-    run_measure_test(channel).await
+fn test_measure_usb() -> Result<()> {
+    let channel = test_channel_usb()?;
+    run_measure_test(channel)
 }
 
-async fn run_limit_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
-    channel
-        .set_limit(LimitQuantity::Voltage, 1.337.into())
-        .await?;
-    assert_eq!(channel.get_limit(LimitQuantity::Voltage).await?, 1.337);
+fn run_limit_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
+    channel.set_limit(LimitQuantity::Voltage, 1.337.into())?;
+    assert_eq!(channel.get_limit(LimitQuantity::Voltage)?, 1.337);
 
-    channel
-        .set_limit(LimitQuantity::Voltage, 2.337.into())
-        .await?;
-    assert_eq!(channel.get_limit(LimitQuantity::Voltage).await?, 2.337);
+    channel.set_limit(LimitQuantity::Voltage, 2.337.into())?;
+    assert_eq!(channel.get_limit(LimitQuantity::Voltage)?, 2.337);
 
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_limit_network() -> Result<()> {
-    let channel = test_channel_network().await?;
-    run_limit_test(channel).await
+fn test_limit_network() -> Result<()> {
+    let channel = test_channel_network()?;
+    run_limit_test(channel)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_limit_usb() -> Result<()> {
-    let channel = test_channel_usb().await?;
-    run_limit_test(channel).await
+fn test_limit_usb() -> Result<()> {
+    let channel = test_channel_usb()?;
+    run_limit_test(channel)
 }
 
-async fn run_output_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
-    channel.set_output(State::On).await?;
-    assert_eq!(channel.get_output().await?, State::On);
+fn run_output_test<D: Driver>(channel: ChannelControl<D>) -> Result<()> {
+    channel.set_output(State::On)?;
+    assert_eq!(channel.get_output()?, State::On);
 
-    channel.set_output(State::Off).await?;
-    assert_eq!(channel.get_output().await?, State::Off);
+    channel.set_output(State::Off)?;
+    assert_eq!(channel.get_output()?, State::Off);
 
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_output_network() -> Result<()> {
-    let channel = test_channel_network().await?;
-    run_output_test(channel).await
+fn test_output_network() -> Result<()> {
+    let channel = test_channel_network()?;
+    run_output_test(channel)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_output_usb() -> Result<()> {
-    let channel = test_channel_usb().await?;
-    run_output_test(channel).await
+fn test_output_usb() -> Result<()> {
+    let channel = test_channel_usb()?;
+    run_output_test(channel)
 }
 
-async fn run_operation_mode_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
-    spd.set_output_mode(OperationMode::Independent).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Independent
-    );
+fn run_operation_mode_test<D: Driver>(mut spd: Spd3303x<D>) -> Result<()> {
+    spd.set_output_mode(OperationMode::Independent)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Independent);
 
-    spd.set_output_mode(OperationMode::Parallel).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Parallel
-    );
+    spd.set_output_mode(OperationMode::Parallel)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Parallel);
 
-    spd.set_output_mode(OperationMode::Series).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Series
-    );
+    spd.set_output_mode(OperationMode::Series)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Series);
 
-    spd.set_output_mode(OperationMode::Independent).await?;
-    assert_eq!(
-        spd.get_status().await?.operation_mode,
-        OperationMode::Independent
-    );
+    spd.set_output_mode(OperationMode::Independent)?;
+    assert_eq!(spd.get_status()?.operation_mode, OperationMode::Independent);
 
     Ok(())
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_operation_mode_network() -> Result<()> {
-    let spd = test_network_device().await?;
-    run_operation_mode_test(spd).await
+fn test_operation_mode_network() -> Result<()> {
+    let spd = test_network_device()?;
+    run_operation_mode_test(spd)
 }
 
-#[tokio::test]
+#[test]
 #[serial]
-async fn test_operation_mode_usb() -> Result<()> {
-    let spd = test_usb_device().await?;
-    run_operation_mode_test(spd).await
+fn test_operation_mode_usb() -> Result<()> {
+    let spd = test_usb_device()?;
+    run_operation_mode_test(spd)
+}
+
+#[test]
+#[serial]
+fn test_auto_off_drop() -> Result<()> {
+    {
+        // Step 1: Create the SPD3303X instance inside a block
+        let mut spd = test_network_device()?;
+        spd.set_output(spd3303x::commands::OutputChannel::One, State::On)?;
+
+        // Optionally verify that it’s ON before dropping
+        let state = spd.get_output(Channel::One)?;
+        assert_eq!(state, State::On);
+    } // <- `spd` dropped here, Drop runs
+
+    // Step 2: Reconnect to check if the output is OFF
+    let mut spd = test_network_device()?;
+    let state = spd.get_output(Channel::One)?;
+    assert_eq!(state, State::Off, "Expected output to be OFF after drop");
+
+    Ok(())
 }
