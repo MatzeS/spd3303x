@@ -260,9 +260,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scpi-client"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0d765807e27fb7219ebd65ce627fc58e91e0c9e6b0665aa394c1a88b1628673"
+version = "0.1.1"
 dependencies = [
  "lazy_static",
  "regex",
@@ -317,6 +315,8 @@ name = "spd3303x"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "lazy_static",
+ "regex",
  "scpi-client",
  "serial_test",
  "thiserror",

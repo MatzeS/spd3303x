@@ -1,8 +1,9 @@
 use std::{net::Ipv4Addr, ops::Neg};
 
+use regex::Regex;
 use scpi_client::{
     EmptyResponse, Error, ScpiDeserialize, ScpiSerialize, impl_scpi_request, impl_scpi_serialize,
-    match_literal, read_all, read_until, read_while, scpi_enum,
+    match_literal, read_all, read_prefix, read_until, scpi_enum,
 };
 
 // 1. *IDN?
@@ -731,14 +732,16 @@ impl SystemStatusResponse {
     }
 }
 
+lazy_static::lazy_static! {
+    static ref REGEX_HEX_DIGIT: Regex = Regex::new(r"^[0-9a-fA-F]+").unwrap();
+}
+
 impl ScpiDeserialize for SystemStatusResponse {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
         match_literal(input, "0x")?;
-        let value =
-            u16::from_str_radix(read_while(input, |c: char| char::is_ascii_hexdigit(&c)), 16)
-                .map_err(|e| {
-                    scpi_client::Error::ResponseDecoding(format!("Failed to parse hex: {e}"))
-                })?;
+        let value = u16::from_str_radix(read_prefix(input, &REGEX_HEX_DIGIT), 16).map_err(|e| {
+            scpi_client::Error::ResponseDecoding(format!("Failed to parse hex: {e}"))
+        })?;
         match_literal(input, "\n")?;
         Ok(SystemStatusResponse { value })
     }
@@ -788,21 +791,14 @@ impl ScpiSerialize for DottedDecimalNotationIpv4Addr {
 
 impl ScpiDeserialize for DottedDecimalNotationIpv4Addr {
     fn deserialize(input: &mut &str) -> Result<Self, Error> {
-        let address = input
-            .trim()
-            .parse()
-            .map_err(|e| Error::ResponseDecoding(format!("Failed to parse IPv4 Address: {e}")))?;
-
-        // advance input reader
-        read_while(input, char::is_numeric); //TODO is_digit?
+        let a = u8::deserialize(input)?;
         match_literal(input, ".")?;
-        read_while(input, char::is_numeric);
+        let b = u8::deserialize(input)?;
         match_literal(input, ".")?;
-        read_while(input, char::is_numeric);
+        let c = u8::deserialize(input)?;
         match_literal(input, ".")?;
-        read_while(input, char::is_numeric);
-
-        Ok(DottedDecimalNotationIpv4Addr(address))
+        let d = u8::deserialize(input)?;
+        Ok(DottedDecimalNotationIpv4Addr(Ipv4Addr::new(a, b, c, d)))
     }
 }
 
