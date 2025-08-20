@@ -945,4 +945,11 @@ mod tests {
         assert_eq!(response.software_version, "1.01.01.01.02");
         assert_eq!(response.hardware_version, "V3.0");
     }
+
+    #[test]
+    fn test_ip_deserialization() {
+        let mut input: &str = "104.3.255.200";
+        let result = DottedDecimalNotationIpv4Addr::deserialize(&mut input);
+        assert_eq!(result.unwrap().0.to_string(), "104.3.255.200");
+    }
 }
