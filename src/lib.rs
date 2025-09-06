@@ -3,6 +3,7 @@ use thiserror::Error;
 pub mod auto_turn_off;
 pub mod channel_control;
 pub mod commands;
+pub mod device_selector;
 pub mod fixed_channel_control;
 pub mod spd3303x;
 

@@ -2,20 +2,15 @@ use anyhow::anyhow;
 use spd3303x::{
     Result,
     commands::{LimitQuantity, Quantity, Reading, State},
+    device_selector::DeviceSelector,
     spd3303x::Spd3303x,
 };
 
 fn main() -> Result<()> {
-    let hostname = std::env::var("TEST_SPD3303X")
+    let selector = std::env::var("TEST_SPD3303X")
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
-    let serial_number = std::env::var("TEST_SPD3303X_SERIAL")
-        .map_err(|e| anyhow!("Environment variable TEST_SPD3303X_SERIAL not set! `{e}`"))?;
-
-    let mut power_supply = Spd3303x::connect_hostname(hostname.as_str())?;
-
-    // Serial number verification is recommended, to ensure
-    // you are not accidentally connecting to the wrong device.
-    power_supply.verify_serial_number(serial_number.as_str())?;
+    let selector = selector.parse::<DeviceSelector>().map_err(|e| anyhow!(e))?;
+    let power_supply = Spd3303x::connect(selector)?;
 
     // Auto turn off ensures the channel is turned off, when the channel is dropped.
     let (ch1, _ch2, ch3) = power_supply.into_auto_turn_off_channels();

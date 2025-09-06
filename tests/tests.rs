@@ -3,14 +3,15 @@ use spd3303x::{
     Result,
     channel_control::ChannelControl,
     commands::{Channel, LimitQuantity, MemorySlot, OperationMode, Quantity, State},
+    device_selector::DeviceSelector,
     spd3303x::Spd3303x,
 };
 
 fn test_device() -> Result<Spd3303x> {
-    let hostname = std::env::var("TEST_SPD3303X")
+    let selector = std::env::var("TEST_SPD3303X")
         .map_err(|e| anyhow!("Environment variable TEST_SPD3303X not set! `{e}`"))?;
-
-    let power_supply = Spd3303x::connect_hostname(hostname.as_str())?;
+    let selector = selector.parse::<DeviceSelector>().map_err(|e| anyhow!(e))?;
+    let power_supply = Spd3303x::connect(selector)?;
     Ok(power_supply)
 }
 

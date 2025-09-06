@@ -4,12 +4,12 @@ Rust library for controlling the *Siglent SPD3303X* programmable power supply.
 
 ## Usage
 ```
-let mut power_supply = Spd3303x::connect_hostname("<IP goes here>")?;
+// DeviceSelector provides an easy user-input decoder for connection optitons!
+let selector = "usb/<SPD serial num>".parse::<DeviceSelector>();
 
-// Double check we talk to the correct device.
-power_supply
-    .verify_serial_number("<your serial number>")
-    ?;
+// When providing a serial number to the selector, it is verified during connection.
+// This avoids accidentally connecting to the wrong device.
+let mut power_supply = Spd3303x::connect(selector)?;
 
 let (ch1, ch2, ch3) = power_supply.into_channels();
 

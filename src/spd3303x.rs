@@ -22,29 +22,42 @@ use crate::{
         SystemStatusRequest, SystemVersionRequest, SystemVersionResponse, TimeInterval,
         TimingGroup, WaveformDisplayRequest,
     },
+    device_selector::{CommunicationInterface, DeviceSelector},
     fixed_channel_control::FixedChannelControl,
 };
-use anyhow::anyhow;
 pub struct Spd3303x {
     stream: TcpStream,
 }
 
 impl Spd3303x {
+    pub fn connect(selector: DeviceSelector) -> Result<Self> {
+        let DeviceSelector {
+            communication_interface,
+            serial_number,
+        } = selector;
+
+        let mut spd = match communication_interface {
+            CommunicationInterface::Usb => unimplemented!("USB is not yet implemented"),
+            CommunicationInterface::TcpIp { hostname, port } => {
+                Self::connect_tcp_ip(hostname.as_str(), port)?
+            }
+        };
+
+        if let Some(serial_number) = serial_number {
+            spd.verify_serial_number(serial_number.as_str())?;
+        }
+
+        Ok(spd)
+    }
+
     /// Looks up the address(es) for `host` and tries connecting to the device.
     /// Attempts all addresses,
     /// fails if connection could not be established on any address.
-    pub fn connect_hostname(host: &str) -> Result<Self> {
-        let (hostname, port_str) = host
-            .rsplit_once(':')
-            .ok_or_else(|| anyhow!("Missing ':' separator in host string"))?;
-        let port = port_str
-            .parse::<u16>()
-            .map_err(|_| Error::Other("Invalid port".to_string()))?;
-
+    fn connect_tcp_ip(hostname: &str, port: u16) -> Result<Self> {
         let addresses = (hostname, port).to_socket_addrs()?.collect::<Vec<_>>();
         if addresses.is_empty() {
             return Err(Error::ConnectFailed(format!(
-                "Lookup provided no addresses for `{host}`"
+                "Lookup provided no addresses for `{hostname}`"
             )));
         }
 
@@ -61,6 +74,7 @@ impl Spd3303x {
         ))
     }
 
+    // TODO deprecated? remove
     pub fn connect_address(addr: SocketAddr) -> Result<Self> {
         Ok(Self::new(TcpStream::connect(addr)?))
     }
